@@ -70,6 +70,7 @@ if __name__ == '__main__':
 
 	fltRatio = float(intWidth) / float(intHeight)
 
+	# Resize dimension to max 1024 width or height and keep aspect ratio
 	intWidth = min(int(1024 * fltRatio), 1024)
 	intHeight = min(int(1024 / fltRatio), 1024)
 

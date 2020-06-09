@@ -198,14 +198,20 @@ moduleSemantics = Semantics().cuda().eval()
 moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch'))
 
 def disparity_estimation(tenImage):
+	# tenImage.shape = (1, 3, 768, 1024) (mini-batch, channels, height, width)
 	intWidth = tenImage.shape[3]
 	intHeight = tenImage.shape[2]
 
 	fltRatio = float(intWidth) / float(intHeight)
 
+	# Resize dimension to max 512 width or height and keep aspect ratio
 	intWidth = min(int(512 * fltRatio), 512)
 	intHeight = min(int(512 / fltRatio), 512)
 
+	# Down samples the input to either the given size
+	# align_corners=False:
+	# the input and output tensors are aligned by the corner points of their corner pixels,
+	# and the interpolation uses edge value padding for out-of-boundary values
 	tenImage = torch.nn.functional.interpolate(input=tenImage, size=(intHeight, intWidth), mode='bilinear', align_corners=False)
 
 	return moduleDisparity(tenImage, moduleSemantics(tenImage))

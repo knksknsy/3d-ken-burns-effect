@@ -14,6 +14,10 @@ def process_load(npyImage, objSettings):
 	objCommon['intWidth'] = npyImage.shape[1]
 	objCommon['intHeight'] = npyImage.shape[0]
 
+	# npyImage.shape = (768, 1024, 3)
+	# npyImage.transpose(2, 0, 1).shape = (3, 768, 1024)
+	# npyImage.transpose(2, 0, 1)[None, :, :, :].shape = (1, 3, 768, 1024) (mini-batch, channels, height, width)
+	# transpose image, extend shape by 1, and normalize
 	tenImage = torch.FloatTensor(numpy.ascontiguousarray(npyImage.transpose(2, 0, 1)[None, :, :, :].astype(numpy.float32) * (1.0 / 255.0))).cuda()
 	tenDisparity = disparity_estimation(tenImage)
 	tenDisparity = disparity_adjustment(tenImage, tenDisparity)
