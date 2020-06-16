@@ -56,7 +56,7 @@ def disparity_adjustment(tenImage, tenDisparity):
 		tenMasks.append(tenMask)
 	# end
 
-	tenAdjusted = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False) # Resize tenDisparity to original tenImage size
+	tenAdjusted = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False) # Resize (upscale) tenDisparity to original tenImage size
 
 	for tenAdjust in tenMasks:
 		tenPlane = tenAdjusted * tenAdjust # ???
@@ -64,13 +64,13 @@ def disparity_adjustment(tenImage, tenDisparity):
 		tenPlane = torch.nn.functional.max_pool2d(input=tenPlane.neg(), kernel_size=3, stride=1, padding=1).neg()
 		tenPlane = torch.nn.functional.max_pool2d(input=tenPlane.neg(), kernel_size=3, stride=1, padding=1).neg()
 
-		intLeft = (tenPlane.sum(2, True) > 0.0).flatten().nonzero()[0].item()
-		intTop = (tenPlane.sum(3, True) > 0.0).flatten().nonzero()[0].item()
-		intRight = (tenPlane.sum(2, True) > 0.0).flatten().nonzero()[-1].item()
-		intBottom = (tenPlane.sum(3, True) > 0.0).flatten().nonzero()[-1].item()
+		intLeft = (tenPlane.sum(2, True) > 0.0).flatten().nonzero()[0].item() # Get index of first non-zero value of mask (width)
+		intTop = (tenPlane.sum(3, True) > 0.0).flatten().nonzero()[0].item() # Get index of first non-zero value of mask (height)
+		intRight = (tenPlane.sum(2, True) > 0.0).flatten().nonzero()[-1].item() # Get index of last non-zero value of mask (width)
+		intBottom = (tenPlane.sum(3, True) > 0.0).flatten().nonzero()[-1].item() # Get index of last non-zero value of mask (height)
 
-		tenAdjusted = ((1.0 - tenAdjust) * tenAdjusted) + (tenAdjust * tenPlane[:, :, int(round(intTop + (0.97 * (intBottom - intTop)))):, :].max())
+		tenAdjusted = ((1.0 - tenAdjust) * tenAdjusted) + (tenAdjust * tenPlane[:, :, int(round(intTop + (0.97 * (intBottom - intTop)))):, :].max()) # ???
 	# end
 
-	return torch.nn.functional.interpolate(input=tenAdjusted, size=(tenDisparity.shape[2], tenDisparity.shape[3]), mode='bilinear', align_corners=False)
+	return torch.nn.functional.interpolate(input=tenAdjusted, size=(tenDisparity.shape[2], tenDisparity.shape[3]), mode='bilinear', align_corners=False) # Resize (downscale) tenAdjusted to tenDisparity size
 # end

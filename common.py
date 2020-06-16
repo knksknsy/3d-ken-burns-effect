@@ -34,8 +34,8 @@ def process_load(npyImage, objSettings):
 	objCommon['tenRawImage'] = tenImage
 	objCommon['tenRawDisparity'] = tenDisparity
 	objCommon['tenRawDepth'] = tenDepth
-	objCommon['tenRawPoints'] = tenPoints.view(1, 3, -1)
-	objCommon['tenRawUnaltered'] = tenUnaltered.view(1, 3, -1)
+	objCommon['tenRawPoints'] = tenPoints.view(1, 3, -1) # same as reshape
+	objCommon['tenRawUnaltered'] = tenUnaltered.view(1, 3, -1) # same as reshape
 
 	objCommon['tenInpaImage'] = objCommon['tenRawImage'].view(1, 3, -1)
 	objCommon['tenInpaDisparity'] = objCommon['tenRawDisparity'].view(1, 1, -1)
