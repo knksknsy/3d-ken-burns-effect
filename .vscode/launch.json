@@ -10,7 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/doublestrike.jpg", "--out", "./autozoom.mp4"]
+            "args": ["--in", "./images/doublestrike.jpg", "--out", "./autozoom.mp4"],
+            "justMyCode": false
         }
     ],
     "debugOptions": ["DebugStdLib"]
