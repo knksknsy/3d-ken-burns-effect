@@ -14,7 +14,7 @@ In order to generate the video results, please also make sure to have `pip insta
 To run it on an image and generate the 3D Ken Burns effect fully automatically, use the following command.
 
 ```
-python autozoom.py --in ./images/doublestrike.jpg --out ./autozoom.mp4
+python autozoom.py --in ./images/doublestrike.jpg --out ./videos/autozoom.mp4
 ```
 
 To start the interface that allows you to manually adjust the camera path, use the following command. You can then navigate to `http://localhost:8080/` and load an image using the button on the bottom right corner. Please be patient when loading an image and saving the result, there is a bit of background processing going on.
