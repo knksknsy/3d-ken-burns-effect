@@ -53,7 +53,7 @@ exec(compile(open('./models/pointcloud_inpainting.py', 'r').read(), './models/po
 ##########################################################
 
 arguments_strIn = './images/doublestrike.jpg'
-arguments_strOut = './autozoom.mp4'
+arguments_strOut = './videos/autozoom.mp4'
 
 for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
 	if strOption == '--in' and strArgument != '': arguments_strIn = strArgument # path to the input image
