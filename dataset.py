@@ -1,3 +1,5 @@
+'''Copy this script to a path and execute it in order to download the dataset into the path.'''
+
 from enum import Enum
 import re
 import urllib.request
@@ -22,11 +24,14 @@ class Category(Enum):
     URL_DEPTH = 8
 
 def main():
+    # Read dataset.txt file
     with open(dataset_txt) as f:
         content = f.readlines() 
 
+    # Remove trailing whitespace in lines
     content = [x.strip() for x in content]
 
+    # Cleansing of each line and initializing the dataset array
     for i, c in enumerate(content):
         c = c.replace(' ', '')
         c_split = c.split('|')
@@ -62,16 +67,20 @@ def main():
 
     print(f'Total dataset size: {np.sum(filesizes)} GB')
 
+    # Create 3d-ken-burns-dataset directory if it does not exist
     if not path.exists(dataset_path):
         os.mkdir(dataset_path)
     
+    # User input for starting or canceling download procedure
     print('Start download? Type [N] to cancel. Press return to start download.')
     proceed = input()
     if proceed == 'N':
         print('Download terminated.')
         sys.exit()
 
+    # Start download
     for i, data in enumerate(dataset):
+        # Extract meta-information
         scene = data[Category.SCENE.value]
         mode = data[Category.MODE.value]
         color = data[Category.COLOR.value]
@@ -80,14 +89,17 @@ def main():
         filename_color = scene + '-' + mode + '.zip'
         filename_depth = scene + '-' + mode + '-depth.zip'
 
+        # Set saving path
         file_path_color = dataset_path + '/' + filename_color
         file_path_depth = dataset_path + '/' + filename_depth
 
+        # Download COLOR datasets. Skip already downloaded datasets
         if not path.exists(file_path_color):
             print(f'Downloading {filename_color} ({data[Category.SIZE_COLOR.value]} GB)')
             url_color = data[Category.URL_COLOR.value]
             urllib.request.urlretrieve(url_color, file_path_color)
 
+        # # Download DEPTH datasets. Skip already downloaded datasets
         if not path.exists(file_path_depth):
             print(f'Downloading {filename_depth} ({data[Category.SIZE_DEPTH.value]} GB)')
             url_depth = data[Category.URL_DEPTH.value]
