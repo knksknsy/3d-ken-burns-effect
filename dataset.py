@@ -77,15 +77,21 @@ def main():
         color = data[Category.COLOR.value]
         depth = data[Category.DEPTH.value]
 
-        filename = scene + '-' + mode + '.zip'
+        filename_color = scene + '-' + mode + '.zip'
+        filename_depth = scene + '-' + mode + '-depth.zip'
 
-        if not path.exists(filename):
-            print(f'Downloading {filename} ({filesizes[i]} GB)')
+        file_path_color = dataset_path + '/' + filename_color
+        file_path_depth = dataset_path + '/' + filename_depth
+
+        if not path.exists(file_path_color):
+            print(f'Downloading {filename_color} ({data[Category.SIZE_COLOR.value]} GB)')
             url_color = data[Category.URL_COLOR.value]
-            url_depth = data[Category.URL_DEPTH.value]
-            file_path = dataset_path + '/' + filename
+            urllib.request.urlretrieve(url_color, file_path_color)
 
-            urllib.request.urlretrieve(url_color, file_path)
+        if not path.exists(file_path_depth):
+            print(f'Downloading {filename_depth} ({data[Category.SIZE_DEPTH.value]} GB)')
+            url_depth = data[Category.URL_DEPTH.value]
+            urllib.request.urlretrieve(url_depth, file_path_depth)
 
 if __name__ == "__main__":
     main()
