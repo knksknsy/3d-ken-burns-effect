@@ -83,6 +83,7 @@ class Semantics(torch.nn.Module):
 
 		moduleVgg = torchvision.models.vgg19_bn(pretrained=True).features.eval()
 
+		# adjust vgg19 architecture: get first layers 0 - 40 (original #layers 53) # replace MaxPool2d(..., ceil_mode=True) with MaxPool2d(..., ceil_mode=False) => aufrunden statt abrunden
 		self.moduleVgg = torch.nn.Sequential(
 			moduleVgg[0:3],
 			moduleVgg[3:6],
@@ -151,6 +152,7 @@ class Disparity(torch.nn.Module):
 	# end
 
 	def forward(self, tenImage, tenSemantics):
+		order = []
 		tenColumn = [ None, None, None, None, None, None ]
 
 		tenColumn[0] = self.moduleImage(tenImage)
@@ -163,19 +165,27 @@ class Disparity(torch.nn.Module):
 		intColumn = 1
 		for intRow in range(len(tenColumn)):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '0x0 - 0x1', '1x0 - 1x1', ..., '5x0 - 5x1' # Image and semantic features
+			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
 			if intRow != 0: # ignore first
 				tenColumn[intRow] += self._modules[str(intRow - 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow - 1]) # '0x1 - 1x1', '1x1 - 2x1', '2x1 - 3x1', '3x1 - 4x1', '4x1 - 5x1' # Downsampling col 1
+				order.append(str(intRow - 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
 			# end
 		# end
 
 		intColumn = 2
 		for intRow in range(len(tenColumn) -1, -1, -1):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '5x1 - 5x2', ..., '1x1 - 1x2', '0x1 - 0x2'
+			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
 			if intRow != len(tenColumn) - 1: # ignore first
 				tenUp = self._modules[str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow + 1]) # '5x2 - 4x2', '4x2 - 3x2', '3x2 - 2x2', '2x2 - 1x2', '1x2 - 0x2' # Upsampline col 2
+				order.append(str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
 
-				if tenUp.shape[2] != tenColumn[intRow].shape[2]: tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
-				if tenUp.shape[3] != tenColumn[intRow].shape[3]: tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode='constant', value=0.0)
+				if tenUp.shape[2] != tenColumn[intRow].shape[2]:
+					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
+					order.append('torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode="constant", value=0.0)')
+				if tenUp.shape[3] != tenColumn[intRow].shape[3]:
+					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode='constant', value=0.0)
+					order.append('torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode="constant", value=0.0)')
 
 				tenColumn[intRow] += tenUp
 			# end
@@ -184,15 +194,28 @@ class Disparity(torch.nn.Module):
 		intColumn = 3
 		for intRow in range(len(tenColumn) -1, -1, -1):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '5x2 - 5x3', ..., '1x2 - 1x3', '0x2 - 0x3'  
+			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
 			if intRow != len(tenColumn) - 1: # ignore first
 				tenUp = self._modules[str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow + 1]) # '5x3 - 4x3', '4x3 - 3x3', '3x3 - 2x3', '2x3 - 1x3', '1x3 - 0x3' # Upsampline col 3
+				order.append(str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
 
-				if tenUp.shape[2] != tenColumn[intRow].shape[2]: tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
-				if tenUp.shape[3] != tenColumn[intRow].shape[3]: tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode='constant', value=0.0)
+				if tenUp.shape[2] != tenColumn[intRow].shape[2]:
+					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
+					order.append('torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode="constant", value=0.0)')
+				if tenUp.shape[3] != tenColumn[intRow].shape[3]:
+					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode='constant', value=0.0)
+					order.append('torch.nn.functional.pad(input=tenUp, pad=[ 0, -1, 0, 0 ], mode="constant", value=0.0)')
 
 				tenColumn[intRow] += tenUp
 			# end
 		# end
+
+		order.append('torch.nn.functional.threshold(input=self.moduleDisparity(tenColumn[0]), threshold=0.0, value=0.0)')
+		architecture = []
+
+		for i, o in enumerate(order):
+			if i < len(order)-1:
+				architecture.append(self._modules[o].moduleMain._modules)
 
 		return torch.nn.functional.threshold(input=self.moduleDisparity(tenColumn[0]), threshold=0.0, value=0.0)
 	# end

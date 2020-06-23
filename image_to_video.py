@@ -120,7 +120,9 @@ class Images2Video:
     def depth_map(self, image):
         # Convert float32 into uint8 in order to generate correct images
         image_normalized = (image - numpy.min(image)) / (numpy.max(image) - numpy.min(image))
+        print(f'image normalized: {image_normalized}')
         image = (image_normalized * 255).astype(numpy.uint8) # set is to a range from 0 till 255
+        print(f'image gray: {image}')
         return image
 
 def select_dataset(dirs, pwd):

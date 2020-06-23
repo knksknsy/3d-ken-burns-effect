@@ -20,27 +20,66 @@ def process_load(npyImage, objSettings):
 	# transpose image, extend shape by 1, and normalize
 	tenImage = torch.FloatTensor(numpy.ascontiguousarray(npyImage.transpose(2, 0, 1)[None, :, :, :].astype(numpy.float32) * (1.0 / 255.0))).cuda()
 	tenDisparity = disparity_estimation(tenImage)
+	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
+	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+	cv2.imwrite('disparity_estimation.png', tenDisparityOut)
+	
 	tenDisparity = disparity_adjustment(tenImage, tenDisparity)
+	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
+	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+	cv2.imwrite('disparity_adjustment.png', tenDisparityOut)
+
 	tenDisparity = disparity_refinement(tenImage, tenDisparity)
+	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
+	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+	cv2.imwrite('disparity_refinement.png', tenDisparityOut)
+
 	tenDisparity = tenDisparity / tenDisparity.max() * objCommon['fltBaseline']
+	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
+	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+	cv2.imwrite('disparityFinal.png', tenDisparityOut)
+
 	tenDepth = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (tenDisparity + 0.0000001)
+	tenDepthOut = tenDepth[0, 0, :, :].cpu().numpy()
+	tenDepthNormalized = (tenDepthOut  - numpy.min(tenDepthOut)) / (numpy.max(tenDepthOut) - numpy.min(tenDepthOut))
+	tenDepthGray = (tenDepthNormalized * 255).astype(numpy.uint8)
+	cv2.imwrite('tenDepth.png', tenDepthGray)
+
 	tenValid = (spatial_filter(tenDisparity / tenDisparity.max(), 'laplacian').abs() < 0.03).float()
+	tenValidOut = tenValid[0, 0, :, :].cpu().numpy()
+	f = lambda x: tenValidOut * 255
+	tenValidOut = f(tenValidOut)
+	cv2.imwrite('tenValid.png', tenValidOut)
+
 	tenPoints = depth_to_points(tenDepth * tenValid, objCommon['fltFocal'])
+	tenPointsOut = tenPoints[0,:, :, :].cpu().numpy()
+	tenPointsNormalized = (tenPointsOut - numpy.min(tenPointsOut)) / (numpy.max(tenPointsOut) - numpy.min(tenPointsOut))
+	tenPointsOut = (tenPointsNormalized * 255).astype(numpy.uint8)
+	tenPointsOut = tenPointsOut.transpose(1,2,0)
+	# tenPointsOut = tenPointsOut[:, :, [ 2, 1, 0 ]] # reverse rgb 
+	cv2.imwrite('tenPoints.png', tenPointsOut)
+
 	tenUnaltered = depth_to_points(tenDepth, objCommon['fltFocal'])
+	tenUnalteredOut = tenUnaltered[0, :, :, :].cpu().numpy()
+	tenUnalteredNormalized = (tenUnalteredOut - numpy.min(tenUnalteredOut)) / (numpy.max(tenUnalteredOut) - numpy.min(tenUnalteredOut))
+	tenUnalteredOut = (tenUnalteredNormalized  * 255).astype(numpy.uint8)
+	tenUnalteredOut = tenUnalteredOut.transpose(1,2,0)
+	cv2.imwrite('tenUnaltered.png', tenUnalteredOut)
+
 
 	objCommon['fltDispmin'] = tenDisparity.min().item()
 	objCommon['fltDispmax'] = tenDisparity.max().item()
-	objCommon['objDepthrange'] = cv2.minMaxLoc(src=tenDepth[0, 0, 128:-128, 128:-128].detach().cpu().numpy(), mask=None)
+	objCommon['objDepthrange'] = cv2.minMaxLoc(src=tenDepth[0, 0, 128:-128, 128:-128].detach().cpu().numpy(), mask=None) # return values: minVal, maxVal, minLoc, maxLoc
 	objCommon['tenRawImage'] = tenImage
 	objCommon['tenRawDisparity'] = tenDisparity
 	objCommon['tenRawDepth'] = tenDepth
-	objCommon['tenRawPoints'] = tenPoints.view(1, 3, -1) # same as reshape
-	objCommon['tenRawUnaltered'] = tenUnaltered.view(1, 3, -1) # same as reshape
+	objCommon['tenRawPoints'] = tenPoints.view(1, 3, -1) # flatten image (height * width)
+	objCommon['tenRawUnaltered'] = tenUnaltered.view(1, 3, -1) # flatten image (height * width)
 
-	objCommon['tenInpaImage'] = objCommon['tenRawImage'].view(1, 3, -1)
-	objCommon['tenInpaDisparity'] = objCommon['tenRawDisparity'].view(1, 1, -1)
-	objCommon['tenInpaDepth'] = objCommon['tenRawDepth'].view(1, 1, -1)
-	objCommon['tenInpaPoints'] = objCommon['tenRawPoints'].view(1, 3, -1)
+	objCommon['tenInpaImage'] = objCommon['tenRawImage'].view(1, 3, -1) # flatten image (height * width)
+	objCommon['tenInpaDisparity'] = objCommon['tenRawDisparity'].view(1, 1, -1) # flatten image (height * width)
+	objCommon['tenInpaDepth'] = objCommon['tenRawDepth'].view(1, 1, -1) # flatten image (height * width)
+	objCommon['tenInpaPoints'] = objCommon['tenRawPoints'].view(1, 3, -1) # flatten image (height * width)
 # end
 
 def process_inpaint(tenShift):
@@ -88,8 +127,8 @@ def process_shift(objSettings):
 # end
 
 def process_autozoom(objSettings):
-	npyShiftU = numpy.linspace(-objSettings['fltShift'], objSettings['fltShift'], 16)[None, :].repeat(16, 0)
-	npyShiftV = numpy.linspace(-objSettings['fltShift'], objSettings['fltShift'], 16)[:, None].repeat(16, 1)
+	npyShiftU = numpy.linspace(-objSettings['fltShift'], objSettings['fltShift'], 16)[None, :].repeat(16, 0) # get 16 evenly distributed values between interval [-100,100] # extend dimension before+1 # repeat shape (1,16) *16 => (16,16)
+	npyShiftV = numpy.linspace(-objSettings['fltShift'], objSettings['fltShift'], 16)[:, None].repeat(16, 1) # same as before but align values vertically
 	fltCropWidth = objSettings['objFrom']['intCropWidth'] / objSettings['fltZoom']
 	fltCropHeight = objSettings['objFrom']['intCropHeight'] / objSettings['fltZoom']
 
@@ -128,6 +167,16 @@ def process_autozoom(objSettings):
 			})[0]
 
 			tenRender, tenExisting = render_pointcloud(tenPoints, objCommon['tenRawImage'].view(1, 3, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
+
+			# TODO
+			# tenRenderOut = tenRender[0,:, :, :].cpu().numpy()
+			# tenRenderOut = (tenRenderOut * 255).astype(numpy.uint8)
+			# tenRenderOut = tenRenderOut.transpose(1,2,0)
+			# cv2.imwrite(f'autozoom_images/render/tenRender_{intU}_{intV}.png', tenRenderOut)
+
+			# tenExistingOut = tenExisting[0, 0, :, :].cpu().numpy()
+			# tenExistingOut = (tenExistingOut * 255).astype(numpy.uint8)
+			# cv2.imwrite(f'autozoom_images/existing/tenExisting_{intU}_{intV}.png', tenExistingOut)
 
 			if fltBest < (tenExisting > 0.0).float().sum().item():
 				fltBest = (tenExisting > 0.0).float().sum().item()

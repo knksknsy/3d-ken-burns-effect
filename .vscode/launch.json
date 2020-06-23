@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": ["--in", "./images/doublestrike.jpg", "--out", "./videos/autozoom.mp4"],
-            "justMyCode": false
+            "justMyCode": true
         }
     ],
     "debugOptions": ["DebugStdLib"]
