@@ -108,11 +108,16 @@ class Semantics(torch.nn.Module):
 		# Reverse order of channel
 		tenPreprocessed = tenInput[:, [ 2, 1, 0 ], :, :]
 
-		# Preprocessing ???
+		# Preprocessing: https://stackoverflow.com/questions/58151507/why-pytorch-officially-use-mean-0-485-0-456-0-406-and-std-0-229-0-224-0-2
 		tenPreprocessed[:, 0, :, :] = (tenPreprocessed[:, 0, :, :] - 0.485) / 0.229
 		tenPreprocessed[:, 1, :, :] = (tenPreprocessed[:, 1, :, :] - 0.456) / 0.224
 		tenPreprocessed[:, 2, :, :] = (tenPreprocessed[:, 2, :, :] - 0.406) / 0.225
 
+		# Print architecture/modules (debug console: self)
+		architecture = []
+		for i, m in enumerate(self.named_modules()):
+			architecture.append(m)
+		
 		return self.moduleVgg(tenPreprocessed)
 	# end
 # end
@@ -215,7 +220,10 @@ class Disparity(torch.nn.Module):
 
 		for i, o in enumerate(order):
 			if i < len(order)-1:
-				architecture.append(self._modules[o].moduleMain._modules)
+				architecture.append({
+					'name': o,
+					'layers': self._modules[o].moduleMain._modules
+				})
 
 		return torch.nn.functional.threshold(input=self.moduleDisparity(tenColumn[0]), threshold=0.0, value=0.0)
 	# end
