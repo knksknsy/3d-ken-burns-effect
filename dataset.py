@@ -99,7 +99,7 @@ def main():
 
         # Set saving path
         file_path_color = os.path.join(dataset_path, filename_color)
-        file_path_depth = os.path.joint(dataset_path, filename_depth)
+        file_path_depth = os.path.join(dataset_path, filename_depth)
 
         # Download COLOR datasets. Skip already downloaded datasets
         if not path.exists(file_path_color):
