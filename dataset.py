@@ -10,10 +10,6 @@ from os import path
 from pathlib import Path
 import getopt
 
-dataset_txt = "dataset.txt"
-dataset_path = '3d-ken-burns-dataset'
-dataset = []
-
 class Category(Enum):
     SCENE = 0
     MODE = 1
@@ -26,7 +22,11 @@ class Category(Enum):
     URL_DEPTH = 8
 
 def main():
+    dataset_path = '3d-ken-burns-dataset'
     arguments_path = './'
+    dataset_txt = "dataset.txt"
+    dataset = []
+
     for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
 	    if strOption == '--path' and strArgument != '': arguments_path = strArgument # path to the datasets
 
