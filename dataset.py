@@ -7,6 +7,8 @@ import numpy as np
 import sys
 import os.path
 from os import path
+from pathlib import Path
+import getopt
 
 dataset_txt = "dataset.txt"
 dataset_path = '3d-ken-burns-dataset'
@@ -24,6 +26,12 @@ class Category(Enum):
     URL_DEPTH = 8
 
 def main():
+    arguments_path = './'
+    for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
+	    if strOption == '--path' and strArgument != '': arguments_path = strArgument # path to the datasets
+
+    dataset_path = os.path.join(arguments_path, dataset_path)
+
     # Read dataset.txt file
     with open(dataset_txt) as f:
         content = f.readlines() 
@@ -68,7 +76,7 @@ def main():
     print(f'Total dataset size: {np.sum(filesizes)} GB')
 
     # Create 3d-ken-burns-dataset directory if it does not exist
-    if not path.exists(dataset_path):
+    if not path.exists(os.path.join(arguments_path, dataset_path)):
         os.mkdir(dataset_path)
     
     # User input for starting or canceling download procedure
@@ -90,8 +98,8 @@ def main():
         filename_depth = scene + '-' + mode + '-depth.zip'
 
         # Set saving path
-        file_path_color = dataset_path + '/' + filename_color
-        file_path_depth = dataset_path + '/' + filename_depth
+        file_path_color = os.path.join(dataset_path, filename_color)
+        file_path_depth = os.path.joint(dataset_path, filename_depth)
 
         # Download COLOR datasets. Skip already downloaded datasets
         if not path.exists(file_path_color):
