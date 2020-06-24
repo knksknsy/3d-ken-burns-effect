@@ -22,15 +22,15 @@ class Category(Enum):
     URL_DEPTH = 8
 
 def main():
-    dataset_path = '3d-ken-burns-dataset'
-    arguments_path = './'
+    dataset_dir_name = '3d-ken-burns-dataset'
+    dataset_path = './'
     dataset_txt = "dataset.txt"
     dataset = []
 
     for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
-	    if strOption == '--path' and strArgument != '': arguments_path = strArgument # path to the datasets
+	    if strOption == '--path' and strArgument != '': dataset_path = strArgument # path to the datasets
 
-    dataset_path = os.path.join(arguments_path, dataset_path)
+    dataset_path = os.path.join(dataset_path, dataset_dir_name)
 
     # Read dataset.txt file
     with open(dataset_txt) as f:
@@ -76,7 +76,7 @@ def main():
     print(f'Total dataset size: {np.sum(filesizes)} GB')
 
     # Create 3d-ken-burns-dataset directory if it does not exist
-    if not path.exists(os.path.join(arguments_path, dataset_path)):
+    if not path.exists(dataset_path):
         os.mkdir(dataset_path)
     
     # User input for starting or canceling download procedure
