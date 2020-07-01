@@ -5,12 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "autozoom.py",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "args": ["--in", "./images/doublestrike.jpg", "--out", "./videos/autozoom.mp4"],
+            "justMyCode": true
+        },
+        {
+            "name": "dataset.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--path", "D:\\", "--csv"],
             "justMyCode": true
         }
     ],
