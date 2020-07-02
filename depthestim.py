@@ -3,9 +3,9 @@
 import torch
 import torchvision
 
+from cv2 import cv2
 import base64
 import cupy
-import cv2
 import flask
 import getopt
 import gevent
@@ -67,13 +67,31 @@ if __name__ == '__main__':
 	fltBaseline = 40.0
 
 	tenImage = torch.FloatTensor(numpy.ascontiguousarray(npyImage.transpose(2, 0, 1)[None, :, :, :].astype(numpy.float32) * (1.0 / 255.0))).cuda()
+	
 	tenDisparity = disparity_estimation(tenImage)
+	print(f'estimation.shape:\n{tenDisparity.shape}')
+	print(f'estimation:\n{tenDisparity}')
+	#cv2.imshow('Estimation', tenDisparity[0,0,:,:].cpu().numpy())
+	#cv2.waitKey()
+	
 	tenDisparity = disparity_refinement(torch.nn.functional.interpolate(input=tenImage, size=(tenDisparity.shape[2] * 4, tenDisparity.shape[3] * 4), mode='bilinear', align_corners=False), tenDisparity)
+	print(f'refinement.shape:\n{tenDisparity.shape}')
+	print(f'refinement:\n{tenDisparity}')
+	#cv2.imshow('Refinement', tenDisparity[0,0,:,:].cpu().numpy())
+	#cv2.waitKey()
+	
 	tenDisparity = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False) * (max(tenImage.shape[2], tenImage.shape[3]) / 256.0)
 	tenDepth = (fltFocal * fltBaseline) / (tenDisparity + 0.0000001)
 
 	npyDisparity = tenDisparity[0, 0, :, :].cpu().numpy()
+	print(f'npyDisparity.shape:\n{npyDisparity.shape}')
+	print(f'npyDisparity:\n{npyDisparity}')
+	#cv2.imshow('npyDisparity', npyDisparity)
+	#cv2.waitKey()
+	
 	npyDepth = tenDepth[0, 0, :, :].cpu().numpy()
+
+	print(f'npyDepth:\n{npyDepth}')
 
 	cv2.imwrite(filename=arguments_strOut.replace('.npy', '.png'), img=(npyDisparity / fltBaseline * 255.0).clip(0.0, 255.0).astype(numpy.uint8))
 

@@ -14,12 +14,29 @@
             "justMyCode": true
         },
         {
+            "name": "depthestim.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--in", "./images/doublestrike.jpg", "--out", "./images/depthestim.npy"],
+            "justMyCode": true
+        },
+        {
             "name": "dataset.py",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "args": ["--path", "D:\\", "--csv"],
+            "justMyCode": true
+        },
+        {
+            "name": "Python Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
             "justMyCode": true
         }
     ],

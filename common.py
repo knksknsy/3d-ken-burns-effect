@@ -20,38 +20,45 @@ def process_load(npyImage, objSettings):
 	# transpose image, extend shape by 1, and normalize
 	tenImage = torch.FloatTensor(numpy.ascontiguousarray(npyImage.transpose(2, 0, 1)[None, :, :, :].astype(numpy.float32) * (1.0 / 255.0))).cuda()
 	tenDisparity = disparity_estimation(tenImage)
+	# Debug
 	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
 	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
 	cv2.imwrite('disparity_estimation.png', tenDisparityOut)
 	
 	tenDisparity = disparity_adjustment(tenImage, tenDisparity)
+	# Debug
 	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
 	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
 	cv2.imwrite('disparity_adjustment.png', tenDisparityOut)
 
 	tenDisparity = disparity_refinement(tenImage, tenDisparity)
+	# Debug
 	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
 	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
 	cv2.imwrite('disparity_refinement.png', tenDisparityOut)
 
 	tenDisparity = tenDisparity / tenDisparity.max() * objCommon['fltBaseline']
+	# Debug
 	tenDisparityOut = tenDisparity[0, 0, :, :].cpu().numpy()
 	tenDisparityOut = (tenDisparityOut / objCommon['fltBaseline'] * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
 	cv2.imwrite('disparityFinal.png', tenDisparityOut)
 
 	tenDepth = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (tenDisparity + 0.0000001)
+	# Debug
 	tenDepthOut = tenDepth[0, 0, :, :].cpu().numpy()
 	tenDepthNormalized = (tenDepthOut  - numpy.min(tenDepthOut)) / (numpy.max(tenDepthOut) - numpy.min(tenDepthOut))
 	tenDepthGray = (tenDepthNormalized * 255).astype(numpy.uint8)
 	cv2.imwrite('tenDepth.png', tenDepthGray)
 
 	tenValid = (spatial_filter(tenDisparity / tenDisparity.max(), 'laplacian').abs() < 0.03).float()
+	# Debug
 	tenValidOut = tenValid[0, 0, :, :].cpu().numpy()
 	f = lambda x: tenValidOut * 255
 	tenValidOut = f(tenValidOut)
 	cv2.imwrite('tenValid.png', tenValidOut)
 
 	tenPoints = depth_to_points(tenDepth * tenValid, objCommon['fltFocal'])
+	# Debug
 	tenPointsOut = tenPoints[0,:, :, :].cpu().numpy()
 	tenPointsNormalized = (tenPointsOut - numpy.min(tenPointsOut)) / (numpy.max(tenPointsOut) - numpy.min(tenPointsOut))
 	tenPointsOut = (tenPointsNormalized * 255).astype(numpy.uint8)
@@ -60,6 +67,7 @@ def process_load(npyImage, objSettings):
 	cv2.imwrite('tenPoints.png', tenPointsOut)
 
 	tenUnaltered = depth_to_points(tenDepth, objCommon['fltFocal'])
+	# Debug
 	tenUnalteredOut = tenUnaltered[0, :, :, :].cpu().numpy()
 	tenUnalteredNormalized = (tenUnalteredOut - numpy.min(tenUnalteredOut)) / (numpy.max(tenUnalteredOut) - numpy.min(tenUnalteredOut))
 	tenUnalteredOut = (tenUnalteredNormalized  * 255).astype(numpy.uint8)
