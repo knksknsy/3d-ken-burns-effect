@@ -160,12 +160,6 @@ def main():
 
     selected_data = select_dataset(dirs, Path(arguments_path))
 
-    '''
-    print('Selected datasets:')
-    for sd in selected_data:
-        print(f'\t{sd}')
-    '''
-
     for sd in selected_data:
         img2vid = Images2Video(sd, Path(arguments_path))
         img2vid.generate()

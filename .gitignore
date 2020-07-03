@@ -1,4 +1,3 @@
-3d-ken-burns-dataset/
 models/*.pytorch
 videos/
-autozoom_images/
+images/autozoom/

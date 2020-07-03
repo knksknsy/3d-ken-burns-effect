@@ -174,8 +174,8 @@ def create_csv(dataset_path):
 
     # Save concatenated csv
     data_frame = pd.concat(data_frames, axis=0, ignore_index=True)
-    data_frame.to_csv('dataset.csv', index=False, encoding='utf-8')
-    print('Saved CSV to ./dataset.csv')
+    data_frame.to_csv('./../dataset.csv', index=False, encoding='utf-8')
+    print('Saved CSV to ./../dataset.csv')
 
 if __name__ == "__main__":
     dataset_dir_name = '3d-ken-burns-dataset'

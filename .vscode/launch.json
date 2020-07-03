@@ -19,16 +19,25 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/doublestrike.jpg", "--out", "./images/depthestim.npy"],
+            "args": ["--in", "./../images/doublestrike.jpg", "--out", "./depthestim.npy"],
             "justMyCode": true
         },
         {
-            "name": "dataset.py",
+            "name": "download_dataset.py",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "args": ["--path", "D:\\", "--csv"],
+            "justMyCode": true
+        },
+        {
+            "name": "train_disparity_estimation.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--dataset", "D:\\3d-ken-burns-dataset", "--num-workers", "0"],
             "justMyCode": true
         },
         {
