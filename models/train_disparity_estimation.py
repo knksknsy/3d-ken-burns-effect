@@ -105,8 +105,8 @@ def get_inverse_depth(image, disparity, fltFov, baseline=20):
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
     for batch_idx, sample_batched in enumerate(data_loader):
-        print(batch_idx, sample_batched['image'].size(
-        ), sample_batched['depth'].size(), sample_batched['fltFov'])
+        # print(batch_idx, sample_batched['image'].size(
+        # ), sample_batched['depth'].size(), sample_batched['fltFov'])
 
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
         optimizer.zero_grad()
