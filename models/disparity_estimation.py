@@ -250,7 +250,7 @@ class Disparity(torch.nn.Module):
 # end
 
 moduleSemantics = Semantics().cuda().eval()
-moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./disparity_estimation.pytorch'))
+moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch'))
 
 def disparity_estimation(tenImage):
 	# tenImage.shape = (1, 3, 768, 1024) (mini-batch, channels, height, width)
