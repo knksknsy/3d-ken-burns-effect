@@ -8,7 +8,7 @@
             "name": "autozoom.py",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "autozoom.py",
             "console": "integratedTerminal",
             "args": ["--in", "./images/doublestrike.jpg", "--out", "./videos/autozoom.mp4"],
             "justMyCode": true
@@ -17,16 +17,16 @@
             "name": "depthestim.py",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "./depthestim.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./../images/doublestrike.jpg", "--out", "./depthestim.npy"],
+            "args": ["--in", "./images/doublestrike.jpg", "--out", "./depthestim.npy"],
             "justMyCode": true
         },
         {
             "name": "download_dataset.py",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "./scripts/download_dataset.py",
             "console": "integratedTerminal",
             "args": ["--path", "D:\\", "--csv"],
             "justMyCode": true
@@ -35,7 +35,7 @@
             "name": "train_disparity_estimation.py",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "./models/train_disparity_estimation.py",
             "console": "integratedTerminal",
             "args": ["--dataset", "D:\\3d-ken-burns-dataset", "--num-workers", "0"],
             "justMyCode": true

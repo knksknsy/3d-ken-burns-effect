@@ -1,5 +1,5 @@
 from disparity_estimation import Disparity, Semantics
-from transforms import ToTensor
+from transforms import ToTensor, DownscaleDepth
 from dataset import ImageDepthDataset
 
 import cupy
@@ -7,34 +7,122 @@ import torch
 import torchvision
 from torchvision import transforms, utils
 import argparse
+import math
+from cv2 import cv2
 
 
 def get_optimizer(parameters, lr, betas):
     return torch.optim.Adam(parameters, lr=lr, betas=betas)
 
 
-def loss_depth():
-    pass
+def loss_ord(output, target):
+    loss = torch.FloatTensor([[0]]).cuda()
+    x_dim = range(output.size()[2])
+    y_dim = range(output.size()[1])
+
+    for y in y_dim:
+        for x in x_dim:
+            loss += torch.abs(
+                torch.sub(
+                    output[:, :, y, x],
+                    target[:, y, x]
+                )
+            )
+
+    return loss
+    # return torch.abs(torch.sub(output, target))
 
 
-def train(args, model, device, data_loader, optimizer, epoch):
+def gh(tensor, h, y, x):
+    # ignore NaN values
+    x_dim = tensor.size()[2]
+    y_dim = tensor.size()[1]
+    if (y + h >= y_dim) or (x + h >= x_dim):
+        return torch.FloatTensor([[0, 0]]).transpose(1, 0).cuda()
+
+    if len(tensor.size()) > 3:  # output
+        vec_first_element = torch.div(
+            # y+h > tensor.shape[1] => y
+            torch.sub(tensor[:, :, y+h, x], tensor[:, :, y, x]),
+            torch.add(abs(tensor[:, :, y+h, x]), abs(tensor[:, :, y, x])))
+        vec_second_element = torch.div(
+            torch.sub(tensor[:, :, y, x+h], tensor[:, :, y, x]),
+            torch.add(abs(tensor[:, :, y, x+h]), abs(tensor[:, :, y, x])))
+    else:  # target
+        vec_first_element = torch.div(
+            torch.sub(tensor[:, y+h, x], tensor[:, y, x]),
+            torch.add(abs(tensor[:, y+h, x]), abs(tensor[:, y, x])))
+        vec_second_element = torch.div(
+            torch.sub(tensor[:, y, x+h], tensor[:, y, x]),
+            torch.add(abs(tensor[:, y, x+h]), abs(tensor[:, y, x])))
+
+    return torch.FloatTensor([[vec_first_element, vec_second_element]]).transpose(1, 0).cuda()
+
+
+def loss_grad(output, target):
+    h_values = [pow(2, i) for i in range(0, 5)]
+    loss = torch.FloatTensor([[0, 0]]).transpose(1, 0).cuda()
+    x_dim = range(output.size()[2])
+    y_dim = range(output.size()[1])
+
+    for h in h_values:
+        for y in y_dim:
+            for x in x_dim:
+                loss += torch.abs(
+                    torch.sub(
+                        gh(output, h, y, x),
+                        gh(target, h, y, x)
+                    )
+                )
+
+    return loss
+
+
+def loss_depth(output, target):
+    return torch.add(
+        torch.mul(0.0001, loss_ord(output, target)),
+        loss_grad(output, target)
+    )
+
+
+def get_inverse_depth(image, disparity, fltFov, baseline=20):
+    # calculate focal length with formula: F = A/tan(a)
+    max_dim = max(image.shape[2], image.shape[3]) / 2
+    fltFov = fltFov.item() / 2
+    focal = max_dim / math.tan(fltFov)
+
+    # calculate inverse depth with formula: (focal * baseline) / (0.0000001 + disparity)
+    return (focal * baseline) / (0.0000001 + disparity)
+
+
+def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
     for batch_idx, sample_batched in enumerate(data_loader):
-        print(batch_idx, sample_batched['image'].size(
-        ), sample_batched['depth'].size(), sample_batched['fltFov'])
+        # print(batch_idx, sample_batched['image'].size(
+        # ), sample_batched['depth'].size(), sample_batched['fltFov'])
 
-        # # TODO
-        # image, depth = sample_batched['image'], sample_batched['depth']
-        # optimizer.zero_grad()
-        # # forward pass through Semantics() network
-        # output = model(image)
-        # #loss = F.nll_loss(output, depth) # TODO: implement and call loss_depth()
-        # #loss.backward()
-        # optimizer.step()
-        # if batch_idx % args.log_interval == 0:
-        #     print(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader.dataset)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-        #     if args.dry_run:
-        #         break
+        image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
+        optimizer.zero_grad()
+
+        # forward pass through Semantics() network
+        semanticsOutput = semanticsModel(image)
+
+        disparity = model(image, semanticsOutput)
+
+        # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
+        # cv2.waitKey()
+        # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
+        # cv2.waitKey()
+
+        # get inverse depth of disparity
+        inverse_depth = get_inverse_depth(image, disparity, fltFov)
+
+        loss = loss_depth(inverse_depth, depth)
+        loss.sum().backward()
+        optimizer.step()
+        if batch_idx % args.log_interval == 0:
+            print(
+                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader.dataset)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.sum().item():.6f}')
 
 
 def valid(model, device, data_loader):
@@ -81,18 +169,22 @@ def main():
     device = torch.device("cuda")
 
     # get train and valid dataset
-    transform = transforms.Compose([ToTensor()])
+    transform = transforms.Compose([DownscaleDepth(), ToTensor()])
+
     dataset = ImageDepthDataset(
         csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
     train_loader, valid_loader = dataset.get_train_valid_loader(
         args.batch_size, args.valid_batch_size, args.valid_size, args.seed, args.num_workers, args.pin_memory)
 
     model = Disparity().to(device)
+    semanticsModel = Semantics().to(device).eval()
+
     optimizer = get_optimizer(
         model.parameters(), lr=args.lr, betas=(args.b1, args.b2))
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
+        train(args, model, semanticsModel, device,
+              train_loader, optimizer, epoch)
         valid(model, device, valid_loader)
 
     if args.save_model:

@@ -41,17 +41,17 @@ torch.backends.cudnn.enabled = True # make sure to use cudnn for computational p
 
 objCommon = {}
 
-exec(open('./../common.py', 'r').read())
+exec(open('common.py', 'r').read())
 
-exec(open('./../models/disparity_estimation.py', 'r').read())
-exec(open('./../models/disparity_adjustment.py', 'r').read())
-exec(open('./../models/disparity_refinement.py', 'r').read())
-exec(open('./../models/pointcloud_inpainting.py', 'r').read())
+exec(open('models/disparity_estimation.py', 'r').read())
+exec(open('models/disparity_adjustment.py', 'r').read())
+exec(open('models/disparity_refinement.py', 'r').read())
+exec(open('models/pointcloud_inpainting.py', 'r').read())
 
 ##########################################################
 
-arguments_strIn = './../images/doublestrike.jpg'
-arguments_strOut = './depthestim.npy'
+arguments_strIn = 'images/doublestrike.jpg'
+arguments_strOut = 'depthestim.npy'
 
 for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
 	if strOption == '--in' and strArgument != '': arguments_strIn = strArgument # path to the input image
@@ -71,14 +71,14 @@ if __name__ == '__main__':
 	tenDisparity = disparity_estimation(tenImage)
 	print(f'estimation.shape:\n{tenDisparity.shape}')
 	print(f'estimation:\n{tenDisparity}')
-	#cv2.imshow('Estimation', tenDisparity[0,0,:,:].cpu().numpy())
-	#cv2.waitKey()
+	cv2.imshow('Estimation', tenDisparity[0,0,:,:].cpu().numpy())
+	cv2.waitKey()
 	
 	tenDisparity = disparity_refinement(torch.nn.functional.interpolate(input=tenImage, size=(tenDisparity.shape[2] * 4, tenDisparity.shape[3] * 4), mode='bilinear', align_corners=False), tenDisparity)
 	print(f'refinement.shape:\n{tenDisparity.shape}')
 	print(f'refinement:\n{tenDisparity}')
-	#cv2.imshow('Refinement', tenDisparity[0,0,:,:].cpu().numpy())
-	#cv2.waitKey()
+	cv2.imshow('Refinement', tenDisparity[0,0,:,:].cpu().numpy())
+	cv2.waitKey()
 	
 	tenDisparity = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False) * (max(tenImage.shape[2], tenImage.shape[3]) / 256.0)
 	tenDepth = (fltFocal * fltBaseline) / (tenDisparity + 0.0000001)
@@ -86,8 +86,8 @@ if __name__ == '__main__':
 	npyDisparity = tenDisparity[0, 0, :, :].cpu().numpy()
 	print(f'npyDisparity.shape:\n{npyDisparity.shape}')
 	print(f'npyDisparity:\n{npyDisparity}')
-	#cv2.imshow('npyDisparity', npyDisparity)
-	#cv2.waitKey()
+	cv2.imshow('npyDisparity', npyDisparity)
+	cv2.waitKey()
 	
 	npyDepth = tenDepth[0, 0, :, :].cpu().numpy()
 
