@@ -7,7 +7,7 @@ import torch
 import torchvision
 from torchvision import transforms, utils
 import argparse
-import math
+import numpy as np
 from cv2 import cv2
 
 
@@ -16,7 +16,7 @@ def get_optimizer(parameters, lr, betas):
 
 
 def loss_ord(output, target):
-    loss = torch.FloatTensor([[0]]).cuda()
+    loss = torch.FloatTensor([np.zeros(shape=(output.shape[0], 2))]).cuda()
     x_dim = range(output.size()[2])
     y_dim = range(output.size()[1])
 
@@ -29,7 +29,8 @@ def loss_ord(output, target):
                 )
             )
 
-    return loss
+    #return loss
+    return loss.sum()
     # return torch.abs(torch.sub(output, target))
 
 
@@ -38,7 +39,7 @@ def gh(tensor, h, y, x):
     x_dim = tensor.size()[2]
     y_dim = tensor.size()[1]
     if (y + h >= y_dim) or (x + h >= x_dim):
-        return torch.FloatTensor([[0, 0]]).transpose(1, 0).cuda()
+        return torch.FloatTensor([0]).cuda()
 
     if len(tensor.size()) > 3:  # output
         vec_first_element = torch.div(
@@ -56,12 +57,15 @@ def gh(tensor, h, y, x):
             torch.sub(tensor[:, y, x+h], tensor[:, y, x]),
             torch.add(abs(tensor[:, y, x+h]), abs(tensor[:, y, x])))
 
-    return torch.FloatTensor([[vec_first_element, vec_second_element]]).transpose(1, 0).cuda()
+    # TODO: FIX THIS
+    #torch.add(vec_first_element, vec_second_element)
+    #return torch.FloatTensor([[vec_first_element, vec_second_element]]).transpose(1, 0).cuda()
+    return vec_first_element.sum() + vec_second_element.sum()
 
 
 def loss_grad(output, target):
     h_values = [pow(2, i) for i in range(0, 5)]
-    loss = torch.FloatTensor([[0, 0]]).transpose(1, 0).cuda()
+    loss = torch.FloatTensor([np.zeros(shape=(output.shape[0], 2))]).transpose(1, 0).cuda()
     x_dim = range(output.size()[2])
     y_dim = range(output.size()[1])
 
@@ -88,18 +92,21 @@ def loss_depth(output, target):
 def get_inverse_depth(image, disparity, fltFov, baseline=20):
     # calculate focal length with formula: F = A/tan(a)
     max_dim = max(image.shape[2], image.shape[3]) / 2
-    fltFov = fltFov.item() / 2
-    focal = max_dim / math.tan(fltFov)
+    fltFov = fltFov / 2
+    focal = max_dim / np.tan(fltFov)
 
     # calculate inverse depth with formula: (focal * baseline) / (0.0000001 + disparity)
-    return (focal * baseline) / (0.0000001 + disparity)
+    for i in range(disparity.shape[0]):
+        disparity[i,:,:,:] = (focal[i] * baseline) / (0.0000001 + disparity[i,:,:,:])
+
+    return disparity
 
 
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
     for batch_idx, sample_batched in enumerate(data_loader):
-        # print(batch_idx, sample_batched['image'].size(
-        # ), sample_batched['depth'].size(), sample_batched['fltFov'])
+        print(batch_idx, sample_batched['image'].size(
+        ), sample_batched['depth'].size(), sample_batched['fltFov'])
 
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
         optimizer.zero_grad()
@@ -122,7 +129,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         optimizer.step()
         if batch_idx % args.log_interval == 0:
             print(
-                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader.dataset)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.sum().item():.6f}')
+                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.sum().item():.6f}')
 
 
 def valid(model, device, data_loader):
