@@ -130,7 +130,8 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         if batch_idx % args.log_interval == 0:
             print(
                 f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-            cv2.imwrite(f'{epoch}-{loss}.png')
+            cv2.imwrite(f'disparity-{epoch}-{loss}.png', disparity[0])
+            cv2.imwrite(f'image-{epoch}-{loss}.png', image[0])
 
 
 def valid(model, device, data_loader):
