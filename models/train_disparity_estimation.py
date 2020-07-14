@@ -125,7 +125,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         zero_pads = '0' + str(len(str(len(data_loader))))
         file_name = f'{epoch}-{batch_idx * len(image):^{zero_pads}}-{loss:.2f}'
 
-        progress_bar.set_description(f'Epoch: {epoch}, Loss: {loss.item():.6f}')
+        progress_bar.set_description(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
         if batch_idx % args.log_interval == 0:
             # Debug
@@ -134,8 +134,8 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
             # cv2.waitKey()
 
-            print(
-                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            # print(
+            #     f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
             # save predictions
             multiplier = 255.0 / torch.max(disparity)
