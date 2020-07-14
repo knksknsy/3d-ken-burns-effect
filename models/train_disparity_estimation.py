@@ -10,7 +10,6 @@ import argparse
 import numpy as np
 from cv2 import cv2
 import os
-from tqdm import tqdm
 
 
 def get_optimizer(parameters, lr, betas):
@@ -102,8 +101,8 @@ def get_inverse_depth(image, disparity, fltFov, baseline=20):
 
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
-    progress_bar = tqdm(data_loader)
-    for batch_idx, sample_batched in enumerate(progress_bar):
+
+    for batch_idx, sample_batched in enumerate(data_loader):
         # print(batch_idx, sample_batched['image'].size(
         # ), sample_batched['depth'].size(), sample_batched['fltFov'])
 
@@ -125,8 +124,6 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         zero_pads = '0' + str(len(str(len(data_loader))))
         file_name = f'{epoch}-{batch_idx * len(image):^{zero_pads}}-{loss:.2f}'
 
-        progress_bar.set_description(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-
         if batch_idx % args.log_interval == 0:
             # Debug
             # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
@@ -134,8 +131,8 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
             # cv2.waitKey()
 
-            # print(
-            #     f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            print(
+                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
             # save predictions
             multiplier = 255.0 / torch.max(disparity)
