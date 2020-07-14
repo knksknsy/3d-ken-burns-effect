@@ -9,6 +9,8 @@ from torchvision import transforms, utils
 import argparse
 import numpy as np
 from cv2 import cv2
+import os
+from tqdm import tqdm
 
 
 def get_optimizer(parameters, lr, betas):
@@ -84,6 +86,8 @@ def loss_depth(output, target):
 
 
 def get_inverse_depth(image, disparity, fltFov, baseline=20):
+    inverse_depth = disparity.clone()
+
     # calculate focal length with formula: F = A/tan(a)
     max_dim = max(image.shape[2], image.shape[3]) / 2
     fltFov = fltFov / 2
@@ -91,14 +95,15 @@ def get_inverse_depth(image, disparity, fltFov, baseline=20):
 
     # calculate inverse depth with formula: (focal * baseline) / (0.0000001 + disparity)
     for i in range(disparity.shape[0]):
-        disparity[i,:,:,:] = (focal[i] * baseline) / (0.0000001 + disparity[i,:,:,:])
+        inverse_depth[i,:,:,:] = (focal[i] * baseline) / (0.0000001 + disparity[i,:,:,:])
 
-    return disparity
+    return inverse_depth
 
 
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
-    for batch_idx, sample_batched in enumerate(data_loader):
+    progress_bar = tqdm(data_loader)
+    for batch_idx, sample_batched in enumerate(progress_bar):
         # print(batch_idx, sample_batched['image'].size(
         # ), sample_batched['depth'].size(), sample_batched['fltFov'])
 
@@ -113,16 +118,17 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         # get inverse depth of disparity
         inverse_depth = get_inverse_depth(image, disparity, fltFov)
 
-        # TODO: save checkpoint every 5 %
-        # TODO: resume training from checkpoint
-        # TODO: collect accuracy and loss for plots
-
         loss = loss_depth(inverse_depth, depth).mean()
         loss.backward()
         optimizer.step()
 
+        zero_pads = '0' + str(len(str(len(data_loader))))
+        file_name = f'{epoch}-{batch_idx * len(image):^{zero_pads}}-{loss:.2f}'
+
+        progress_bar.set_description(f'Epoch: {epoch}, Loss: {loss.item():.6f}')
+
         if batch_idx % args.log_interval == 0:
-            # Debuggin
+            # Debug
             # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
             # cv2.waitKey()
             # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
@@ -131,9 +137,24 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             print(
                 f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
-            cv2.imwrite(f'{epoch}-{batch_idx}-{loss:.2f}-disparity.jpg', disparity[0,0,:,:].detach().cpu().numpy())
-            image_denorm = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-            cv2.imwrite(f'{epoch}-{batch_idx}-{loss:.2f}-image.jpg', image_denorm)
+            # save predictions
+            multiplier = 255.0 / torch.max(disparity)
+            disparity_output = disparity * multiplier
+            disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
+            cv2.imwrite(f'{file_name}-disparity.jpg', disparity_output)
+            image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+            cv2.imwrite(f'{file_name}-image.jpg', image_output)
+        
+        # save model checkpoint every 5 % iterations
+        # TODO: continue training from latest checkpoint
+        # TODO: collect accuracy and loss for plots
+        if batch_idx % len(data_loader) * args.epochs * 0.05 == 0:
+            torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            }, os.path.join(args.checkpoints_path, f'{file_name}.pth'))
 
 
 def valid(model, device, data_loader):
@@ -163,6 +184,8 @@ def parse_args():
                         default=False, help='For Saving the current Model')
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
+    parser.add_argument('--checkpoints-path', action='store',
+                        type=str, default='./checkpoints', help='Path to save model checkpoints')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
     parser.add_argument('--valid-size', type=float, default=0.2, metavar='VS',
@@ -175,6 +198,9 @@ def parse_args():
 def main():
     # get arguments from CLI
     args = parse_args()
+
+    if not os.path.isdir(args.checkpoints_path):
+        os.mkdir(args.checkpoints_path, 777)
 
     torch.manual_seed(args.seed)
     device = torch.device("cuda")
