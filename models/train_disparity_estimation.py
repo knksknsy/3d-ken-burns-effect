@@ -121,9 +121,11 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         loss.backward()
         optimizer.step()
 
-        zero_pads = '0' + str(len(str(len(data_loader))))
-        file_name = f'{epoch}-{batch_idx * len(image):^{zero_pads}}-{loss:.2f}'
+        # prepare log message
+        current_iteration = format_log(len(data_loader), batch_idx * len(image))
+        file_name = f'{epoch}-{current_iteration}-{loss:.2f}'
 
+        # log loss and progress
         if batch_idx % args.log_interval == 0:
             # Debug
             # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
@@ -134,7 +136,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             print(
                 f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
-            # save predictions
+            # save output and input of model as JPEG
             multiplier = 255.0 / torch.max(disparity)
             disparity_output = disparity * multiplier
             disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
@@ -142,9 +144,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
             cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
         
-        # save model checkpoint every 5 % iterations
         # TODO: continue training from latest checkpoint
         # TODO: collect accuracy and loss for plots
+        # save model checkpoint every 5 % iterations
         if batch_idx % len(data_loader) * args.epochs * 0.05 == 0:
             torch.save({
             'epoch': epoch,
@@ -152,6 +154,19 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
             }, os.path.join(args.checkpoints_path, f'{file_name}.pth'))
+
+
+def format_log(max_value, current_value):
+    max_length = len(str(max_value))
+    current_length = len(str(current_value))
+
+    difference = max_length - current_length
+
+    output = ''
+    for d in range(difference):
+        output += '0'
+    output += str(current_value)
+    return output
 
 
 def valid(model, device, data_loader):
