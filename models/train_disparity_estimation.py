@@ -16,58 +16,41 @@ def get_optimizer(parameters, lr, betas):
 
 
 def loss_ord(output, target):
-    loss = torch.FloatTensor([np.zeros(shape=(output.shape[0], 2))]).cuda()
+    loss = torch.FloatTensor(np.zeros(shape=(output.shape[0], 1))).cuda()
     x_dim = range(output.size()[2])
     y_dim = range(output.size()[1])
 
     for y in y_dim:
         for x in x_dim:
-            loss += torch.abs(
-                torch.sub(
-                    output[:, :, y, x],
-                    target[:, y, x]
-                )
-            )
+            loss += torch.abs(torch.sub(output[:, :, y, x], target[:, :, y, x]))
 
-    #return loss
-    return loss.sum()
+    return loss
     # return torch.abs(torch.sub(output, target))
 
 
 def gh(tensor, h, y, x):
     # ignore NaN values
-    x_dim = tensor.size()[2]
-    y_dim = tensor.size()[1]
+    x_dim = tensor.shape[3]
+    y_dim = tensor.shape[2]
     if (y + h >= y_dim) or (x + h >= x_dim):
-        return torch.FloatTensor([0]).cuda()
+        return torch.FloatTensor(np.zeros(shape=(tensor.shape[0], 2))).cuda()
 
-    if len(tensor.size()) > 3:  # output
-        vec_first_element = torch.div(
-            # y+h > tensor.shape[1] => y
-            torch.sub(tensor[:, :, y+h, x], tensor[:, :, y, x]),
-            torch.add(abs(tensor[:, :, y+h, x]), abs(tensor[:, :, y, x])))
-        vec_second_element = torch.div(
-            torch.sub(tensor[:, :, y, x+h], tensor[:, :, y, x]),
-            torch.add(abs(tensor[:, :, y, x+h]), abs(tensor[:, :, y, x])))
-    else:  # target
-        vec_first_element = torch.div(
-            torch.sub(tensor[:, y+h, x], tensor[:, y, x]),
-            torch.add(abs(tensor[:, y+h, x]), abs(tensor[:, y, x])))
-        vec_second_element = torch.div(
-            torch.sub(tensor[:, y, x+h], tensor[:, y, x]),
-            torch.add(abs(tensor[:, y, x+h]), abs(tensor[:, y, x])))
+    vec_first_element = torch.div(
+        # y+h > tensor.shape[1] => y
+        torch.sub(tensor[:, :, y+h, x], tensor[:, :, y, x]),
+        torch.add(abs(tensor[:, :, y+h, x]), abs(tensor[:, :, y, x])))
+    vec_second_element = torch.div(
+        torch.sub(tensor[:, :, y, x+h], tensor[:, :, y, x]),
+        torch.add(abs(tensor[:, :, y, x+h]), abs(tensor[:, :, y, x])))
 
-    # TODO: FIX THIS
-    #torch.add(vec_first_element, vec_second_element)
-    #return torch.FloatTensor([[vec_first_element, vec_second_element]]).transpose(1, 0).cuda()
-    return vec_first_element.sum() + vec_second_element.sum()
+    return torch.cat((vec_first_element, vec_second_element), dim=1)
 
 
 def loss_grad(output, target):
     h_values = [pow(2, i) for i in range(0, 5)]
-    loss = torch.FloatTensor([np.zeros(shape=(output.shape[0], 2))]).transpose(1, 0).cuda()
-    x_dim = range(output.size()[2])
-    y_dim = range(output.size()[1])
+    loss = torch.FloatTensor(np.zeros(shape=(output.shape[0], 2))).cuda()
+    x_dim = range(output.shape[2])
+    y_dim = range(output.shape[1])
 
     for h in h_values:
         for y in y_dim:
@@ -116,10 +99,10 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
         disparity = model(image, semanticsOutput)
 
-        # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
-        # cv2.waitKey()
-        # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
-        # cv2.waitKey()
+        #cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
+        #cv2.waitKey()
+        #cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
+        #cv2.waitKey()
 
         # get inverse depth of disparity
         inverse_depth = get_inverse_depth(image, disparity, fltFov)

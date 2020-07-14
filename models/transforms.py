@@ -18,7 +18,7 @@ class ToTensor(object):
         image = torch.FloatTensor(np.ascontiguousarray(
             image.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).cuda()
         depth = torch.FloatTensor(np.ascontiguousarray(
-            depth.astype(np.float32))).cuda()
+            depth[None, :, :].astype(np.float32))).cuda()
 
         return {'image': image, 'depth': depth, 'fltFov': fltFov}
 
