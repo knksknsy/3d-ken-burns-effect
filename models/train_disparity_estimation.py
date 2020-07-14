@@ -141,9 +141,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             multiplier = 255.0 / torch.max(disparity)
             disparity_output = disparity * multiplier
             disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
-            cv2.imwrite(f'{file_name}-disparity.jpg', disparity_output)
+            cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
             image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-            cv2.imwrite(f'{file_name}-image.jpg', image_output)
+            cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
         
         # save model checkpoint every 5 % iterations
         # TODO: continue training from latest checkpoint
@@ -199,8 +199,8 @@ def main():
     # get arguments from CLI
     args = parse_args()
 
-    if not os.path.isdir(args.checkpoints_path):
-        os.mkdir(args.checkpoints_path, 777)
+    # if not os.path.isdir(args.checkpoints_path):
+    #     os.mkdir(args.checkpoints_path, 777)
 
     torch.manual_seed(args.seed)
     device = torch.device("cuda")
