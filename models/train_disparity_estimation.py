@@ -32,7 +32,7 @@ def gh(tensor, h, y, x):
     x_dim = tensor.shape[3]
     y_dim = tensor.shape[2]
     if (y + h >= y_dim) or (x + h >= x_dim):
-        return torch.FloatTensor(np.zeros(shape=(tensor.shape[0], 2))).cuda()
+        return torch.FloatTensor(np.zeros(shape=(2, tensor.shape[0]))).cuda()
 
     vec_first_element = torch.div(
         # y+h > tensor.shape[1] => y
@@ -42,17 +42,17 @@ def gh(tensor, h, y, x):
         torch.sub(tensor[:, :, y, x+h], tensor[:, :, y, x]),
         torch.add(abs(tensor[:, :, y, x+h]), abs(tensor[:, :, y, x])))
 
-    return torch.cat((vec_first_element.t(), vec_second_element.t()), dim=0)
+    vec = torch.cat((vec_first_element.t(), vec_second_element.t()), dim=0)
+    return vec
 
 
 def l2_norm(tensor):
-    batch_dim = range(tensor.shape[0])
-    value_dim = range(tensor.shape[1])
+    batch_dim = range(tensor.shape[1])
 
-    l2_norms = torch.FloatTensor(np.zeros(shape=(tensor.shape[0], 1))).cuda()
+    l2_norms = torch.FloatTensor(np.zeros(shape=(tensor.shape[1], 1))).cuda()
 
     for b in batch_dim:
-        l2_norms[b][0] = torch.sqrt(torch.pow(tensor[b][0], 2) + torch.pow(tensor[b][1], 2))
+        l2_norms[b] = torch.sqrt(torch.pow(tensor[0][b], 2) + torch.pow(tensor[1][b], 2))
     
     return l2_norms
 
@@ -110,16 +110,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
         disparity = model(image, semanticsOutput)
 
-        # Debuggin
-        #cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
-        #cv2.waitKey()
-        #cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
-        #cv2.waitKey()
-
         # get inverse depth of disparity
         inverse_depth = get_inverse_depth(image, disparity, fltFov)
 
-        # TODO: save inverse_depth
         # TODO: save checkpoint every 5 %
         # TODO: resume training from checkpoint
         # TODO: collect accuracy and loss for plots
@@ -127,11 +120,20 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         loss = loss_depth(inverse_depth, depth).mean()
         loss.backward()
         optimizer.step()
+
         if batch_idx % args.log_interval == 0:
+            # Debuggin
+            # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
+            # cv2.waitKey()
+            # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
+            # cv2.waitKey()
+
             print(
                 f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-            cv2.imwrite(f'disparity-{epoch}-{loss}.png', disparity[0])
-            cv2.imwrite(f'image-{epoch}-{loss}.png', image[0])
+
+            cv2.imwrite(f'{epoch}-{batch_idx}-{loss:.2f}-disparity.jpg', disparity[0,0,:,:].detach().cpu().numpy())
+            image_denorm = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+            cv2.imwrite(f'{epoch}-{batch_idx}-{loss:.2f}-image.jpg', image_denorm)
 
 
 def valid(model, device, data_loader):
