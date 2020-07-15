@@ -37,7 +37,7 @@
             "request": "launch",
             "program": "./models/train_disparity_estimation.py",
             "console": "integratedTerminal",
-            "args": ["--dataset", "D:\\3d-ken-burns-dataset", "--num-workers", "0", "--batch-size", "2"],
+            "args": ["--dataset", "D:\\3d-ken-burns-dataset", "--num-workers", "0", "--batch-size", "2", "--valid-size", "0"],
             "justMyCode": true
         },
         {

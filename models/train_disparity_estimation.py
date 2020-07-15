@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 from cv2 import cv2
 import os
+import time
 
 
 def get_optimizer(parameters, lr, betas):
@@ -103,15 +104,12 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
 
     for batch_idx, sample_batched in enumerate(data_loader):
-        # print(batch_idx, sample_batched['image'].size(
-        # ), sample_batched['depth'].size(), sample_batched['fltFov'])
-
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
-        optimizer.zero_grad()
+        #print(batch_idx, image.shape, depth.shape, fltFov.shape)
 
+        optimizer.zero_grad()
         # forward pass through Semantics() network
         semanticsOutput = semanticsModel(image)
-
         disparity = model(image, semanticsOutput)
 
         # get inverse depth of disparity
@@ -122,7 +120,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         optimizer.step()
 
         # prepare log message
-        current_iteration = format_log(len(data_loader), batch_idx * len(image))
+        current_iteration = format_log(len(data_loader) * args.batch_size, batch_idx * len(image))
         file_name = f'{epoch}-{current_iteration}-{loss:.2f}'
 
         # log loss and progress
@@ -133,27 +131,26 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
             # cv2.waitKey()
 
-            print(
-                f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader)} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            print(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
             # save output and input of model as JPEG
             multiplier = 255.0 / torch.max(disparity)
             disparity_output = disparity * multiplier
             disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
             cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
-            image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-            cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
+            # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+            # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
         
         # TODO: continue training from latest checkpoint
         # TODO: collect accuracy and loss for plots
         # save model checkpoint every 5 % iterations
-        if batch_idx % len(data_loader) * args.epochs * 0.05 == 0:
+        if (batch_idx * len(image)) % (len(data_loader) * args.batch_size * args.epochs * 0.05) == 0:
             torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            }, os.path.join(args.checkpoints_path, f'{file_name}.pth'))
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss,
+            }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
 
 
 def format_log(max_value, current_value):
@@ -197,10 +194,10 @@ def parse_args():
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--checkpoints-path', action='store',
-                        type=str, default='./checkpoints', help='Path to save model checkpoints')
+                        type=str, default='checkpoints', help='Path to save model checkpoints')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
-    parser.add_argument('--valid-size', type=float, default=0.2, metavar='VS',
+    parser.add_argument('--valid-size', type=float, default=0.1, metavar='VS',
                         help='Set size of the validation dataset: e.g.: valid-size=0.2 => train-size=0.8')
     parser.add_argument('--pin-memory', action='store_true', default=False,
                         help='Speeds-up the transfer of dataset between CPU and GPU')
@@ -211,29 +208,33 @@ def main():
     # get arguments from CLI
     args = parse_args()
 
-    # if not os.path.isdir(args.checkpoints_path):
-    #     os.mkdir(args.checkpoints_path, 777)
+    # create directory for model checkpoints
+    if not os.path.exists(args.checkpoints_path):
+        os.mkdir(args.checkpoints_path)
 
     torch.manual_seed(args.seed)
     device = torch.device("cuda")
 
     # get train and valid dataset
     transform = transforms.Compose([DownscaleDepth(), ToTensor()])
+    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
 
-    dataset = ImageDepthDataset(
-        csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
     train_loader, valid_loader = dataset.get_train_valid_loader(
-        args.batch_size, args.valid_batch_size, args.valid_size, args.seed, args.num_workers, args.pin_memory)
+        args.batch_size,
+        args.valid_batch_size,
+        args.valid_size,
+        args.seed,
+        args.num_workers,
+        args.pin_memory
+    )
 
     model = Disparity().to(device)
     semanticsModel = Semantics().to(device).eval()
 
-    optimizer = get_optimizer(
-        model.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    optimizer = get_optimizer(model.parameters(), lr=args.lr, betas=(args.b1, args.b2))
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, semanticsModel, device,
-              train_loader, optimizer, epoch)
+        train(args, model, semanticsModel, device, train_loader, optimizer, epoch)
         valid(model, device, valid_loader)
 
     if args.save_model:
@@ -241,4 +242,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #main()
