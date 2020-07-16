@@ -123,51 +123,34 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         current_iteration = format_log(len(data_loader) * args.batch_size, batch_idx * len(image))
         file_name = f'{epoch}-{current_iteration}-{loss:.2f}'
 
-        # <test>
-        print(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-        # save output and input of model as JPEG
-        multiplier = 255.0 / torch.max(disparity)
-        disparity_output = disparity * multiplier
-        disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
-        cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
-        image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-        cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-        }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
-        # </test>
+        # log loss and progress
+        if batch_idx % args.log_interval == 0:
+            # Debug
+            # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
+            # cv2.waitKey()
+            # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
+            # cv2.waitKey()
 
-        # # log loss and progress
-        # if batch_idx % args.log_interval == 0:
-        #     # Debug
-        #     # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
-        #     # cv2.waitKey()
-        #     # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
-        #     # cv2.waitKey()
+            print(f'Train Epoch: {epoch} [{(batch_idx * len(image)) + args.batch_size}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
-        #     print(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-
-        #     # save output and input of model as JPEG
-        #     multiplier = 255.0 / torch.max(disparity)
-        #     disparity_output = disparity * multiplier
-        #     disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
-        #     cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
-        #     # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-        #     # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
+            # save output and input of model as JPEG
+            multiplier = 255.0 / torch.max(disparity)
+            disparity_output = disparity * multiplier
+            disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
+            cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
+            # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+            # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
         
-        # # TODO: continue training from latest checkpoint
-        # # TODO: collect accuracy and loss for plots
-        # # save model checkpoint every 5 % iterations
-        # if (batch_idx * len(image)) % (len(data_loader) * args.batch_size * args.epochs * 0.05) == 0:
-        #     torch.save({
-        #         'epoch': epoch,
-        #         'model_state_dict': model.state_dict(),
-        #         'optimizer_state_dict': optimizer.state_dict(),
-        #         'loss': loss,
-        #     }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
+        # TODO: continue training from latest checkpoint
+        # TODO: collect accuracy and loss for plots
+        # save model checkpoint every 5 % iterations
+        if (batch_idx * len(image)) % (len(data_loader) * args.batch_size * args.epochs * 0.05) == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss,
+            }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
 
 
 def format_log(max_value, current_value):
@@ -234,7 +217,7 @@ def main():
 
     # get train and valid dataset
     transform = transforms.Compose([DownscaleDepth(), ToTensor()])
-    dataset = ImageDepthDataset(csv_file='dataset_test.csv', dataset_path=args.dataset_path, transform=transform)
+    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
 
     train_loader, valid_loader = dataset.get_train_valid_loader(
         args.batch_size,
