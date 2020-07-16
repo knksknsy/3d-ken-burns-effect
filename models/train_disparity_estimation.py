@@ -99,13 +99,14 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         optimizer.zero_grad()
         
         # prepare logs
-        current_step = (batch_idx * len(image)) + args.batch_size
+        current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
         total_steps = len(data_loader) * args.batch_size
         progress = 100. * current_step / total_steps
 
         # forward pass through Semantics() network
         with torch.no_grad():
             semanticsOutput = semanticsModel(image)
+        
         disparity = model(image, semanticsOutput)
         disparity = torch.nn.functional.threshold(disparity, threshold=0.0, value=0.0)
 
@@ -120,13 +121,14 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         # log loss and progress
         if batch_idx % args.log_interval == 0:
             # log progress and loss
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}', end='\r')
 
             # save output and input of model as JPEG
             save_disparity(disparity, file_name=f'./logs/{file_name}-disparity.jpg')
+            save_image(image, file_name=f'./logs/{file_name}-image.jpg')
         
         # save model checkpoint every 5 % iterations
-        if (batch_idx * len(image)) % (len(data_loader) * args.batch_size * args.epochs * 0.05) == 0:
+        if batch_idx % (len(data_loader) * 0.05) == 0:
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -139,6 +141,12 @@ def save_disparity(disparity, file_name):
     disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
     disparity_out = disparity_out.detach().cpu().numpy()
     cv2.imwrite(file_name, disparity_out)
+
+
+def save_image(image, file_name):
+    image_output = image[0,:,:,:].detach().cpu().numpy()
+    image_output = image_output.transpose(1,2,0) * 255
+    cv2.imwrite(file_name, image_output)
 
 
 def pad_current_step(max_steps, current_step):
