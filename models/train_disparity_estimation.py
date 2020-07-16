@@ -123,14 +123,22 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         current_iteration = format_log(len(data_loader) * args.batch_size, batch_idx * len(image))
         file_name = f'{epoch}-{current_iteration}-{loss:.2f}'
 
-        # test
+        # <test>
         print(f'Train Epoch: {epoch} [{batch_idx * len(image)}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+        # save output and input of model as JPEG
+        multiplier = 255.0 / torch.max(disparity)
+        disparity_output = disparity * multiplier
+        disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
+        cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
+        image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+        cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
         }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
+        # </test>
 
         # # log loss and progress
         # if batch_idx % args.log_interval == 0:
