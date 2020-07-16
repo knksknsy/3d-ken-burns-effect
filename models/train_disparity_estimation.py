@@ -85,21 +85,6 @@ def loss_depth(output, target):
     )
 
 
-def get_inverse_depth(image, disparity, fltFov, baseline=20):
-    inverse_depth = disparity.clone()
-
-    # calculate focal length with formula: F = A/tan(a)
-    max_dim = max(image.shape[2], image.shape[3]) / 2
-    fltFov = fltFov / 2
-    focal = max_dim / np.tan(fltFov)
-
-    # calculate inverse depth with formula: (focal * baseline) / (0.0000001 + disparity)
-    for i in range(disparity.shape[0]):
-        inverse_depth[i,:,:,:] = (focal[i] * baseline) / (0.0000001 + disparity[i,:,:,:])
-
-    return inverse_depth
-
-
 # TODO: continue training from latest checkpoint
 # TODO: collect accuracy and loss for plots
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
@@ -119,14 +104,13 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         progress = 100. * current_step / total_steps
 
         # forward pass through Semantics() network
-        semanticsOutput = semanticsModel(image)
+        with torch.no_grad():
+            semanticsOutput = semanticsModel(image)
         disparity = model(image, semanticsOutput)
-
-        # get inverse depth of disparity
-        inverse_depth = get_inverse_depth(image, disparity, fltFov)
+        disparity = torch.nn.functional.threshold(disparity, threshold=0.0, value=0.0)
 
         # calculate loss
-        loss = loss_depth(inverse_depth, depth).mean()
+        loss = loss_depth(disparity, depth).mean()
         loss.backward()
         optimizer.step()
 
@@ -152,12 +136,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
 
 def save_disparity(disparity, file_name):
-    multiplier = 255.0 / torch.max(disparity)
-    disparity_output = disparity * multiplier
-    disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
-    cv2.imwrite(file_name, disparity_output)
-    # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-    # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
+    disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
+    disparity_out = disparity_out.detach().cpu().numpy()
+    cv2.imwrite(file_name, disparity_out)
 
 
 def pad_current_step(max_steps, current_step):

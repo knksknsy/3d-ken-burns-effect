@@ -58,10 +58,8 @@ class ImageDepthDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        zip_image_path = os.path.join(
-            self.dataset_path, self.dataset_frame.iloc[idx, 0])
-        zip_depth_path = os.path.join(
-            self.dataset_path, self.dataset_frame.iloc[idx, 1])
+        zip_image_path = os.path.join(self.dataset_path, self.dataset_frame.iloc[idx, 0])
+        zip_depth_path = os.path.join(self.dataset_path, self.dataset_frame.iloc[idx, 1])
         image_path = self.dataset_frame.iloc[idx, 2]
         depth_path = self.dataset_frame.iloc[idx, 3]
 
@@ -70,14 +68,20 @@ class ImageDepthDataset(Dataset):
         # Read image
         archive_image = ZipFile(zip_image_path, 'r')
         image_bytes = archive_image.read(image_path)
-        image = cv2.imdecode(np.frombuffer(
-            image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
 
         # Read depth
         archive_depth = ZipFile(zip_depth_path, 'r')
         depth_bytes = archive_depth.read(depth_path)
-        depth = cv2.imdecode(np.frombuffer(
-            depth_bytes, np.uint8), cv2.IMREAD_ANYDEPTH)
+        depth = cv2.imdecode(np.frombuffer(depth_bytes, np.uint8), cv2.IMREAD_ANYDEPTH)
+
+        # Convert 32bit depth values to float values
+        # TODO: Set baseline dynamically
+        baseline = 20
+        max_dim = max(image.shape[0], image.shape[1]) / 2
+        fltFov_ = fltFov / 2
+        focal = max_dim / np.tan(np.deg2rad(fltFov_))
+        depth = (focal * baseline) / (depth + 0.0000001)
 
         sample = {'image': image, 'depth': depth, 'fltFov': fltFov}
 

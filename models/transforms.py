@@ -15,16 +15,14 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         # normalize image
-        image = torch.FloatTensor(np.ascontiguousarray(
-            image.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).cuda()
-        depth = torch.FloatTensor(np.ascontiguousarray(
-            depth[None, :, :].astype(np.float32))).cuda()
+        image = torch.FloatTensor(np.ascontiguousarray(image.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).cuda()
+        depth = torch.FloatTensor(np.ascontiguousarray(depth[None, :, :].astype(np.float32))).cuda()
 
         return {'image': image, 'depth': depth, 'fltFov': fltFov}
 
 
 class DownscaleDepth(object):
-    """Convert ndarrays in sample to Tensors."""
+    """Downscale target depth by factor 2"""
 
     def __call__(self, sample):
         image, depth, fltFov = sample['image'], sample['depth'], sample['fltFov']
