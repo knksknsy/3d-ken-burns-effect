@@ -100,14 +100,24 @@ def get_inverse_depth(image, disparity, fltFov, baseline=20):
     return inverse_depth
 
 
+# TODO: continue training from latest checkpoint
+# TODO: collect accuracy and loss for plots
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
 
     for batch_idx, sample_batched in enumerate(data_loader):
+
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
         #print(batch_idx, image.shape, depth.shape, fltFov.shape)
 
+        # reset previously calculated gradients (deallocate memory)
         optimizer.zero_grad()
+        
+        # prepare logs
+        current_step = (batch_idx * len(image)) + args.batch_size
+        total_steps = len(data_loader) * args.batch_size
+        progress = 100. * current_step / total_steps
+
         # forward pass through Semantics() network
         semanticsOutput = semanticsModel(image)
         disparity = model(image, semanticsOutput)
@@ -115,34 +125,22 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         # get inverse depth of disparity
         inverse_depth = get_inverse_depth(image, disparity, fltFov)
 
+        # calculate loss
         loss = loss_depth(inverse_depth, depth).mean()
         loss.backward()
         optimizer.step()
 
-        # prepare log message
-        current_iteration = format_log(len(data_loader) * args.batch_size, batch_idx * len(image))
-        file_name = f'{epoch}-{current_iteration}-{loss:.2f}'
+        # format file names
+        file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
 
         # log loss and progress
         if batch_idx % args.log_interval == 0:
-            # Debug
-            # cv2.imshow('Test', image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0))
-            # cv2.waitKey()
-            # cv2.imshow('Test', disparity[0,0,:,:].detach().cpu().numpy())
-            # cv2.waitKey()
-
-            print(f'Train Epoch: {epoch} [{(batch_idx * len(image)) + args.batch_size}/{len(data_loader) * args.batch_size} ({100. * batch_idx / len(data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            # log progress and loss
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}')
 
             # save output and input of model as JPEG
-            multiplier = 255.0 / torch.max(disparity)
-            disparity_output = disparity * multiplier
-            disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
-            cv2.imwrite(f'./logs/{file_name}-disparity.jpg', disparity_output)
-            # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
-            # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
+            save_disparity(disparity, file_name=f'./logs/{file_name}-disparity.jpg')
         
-        # TODO: continue training from latest checkpoint
-        # TODO: collect accuracy and loss for plots
         # save model checkpoint every 5 % iterations
         if (batch_idx * len(image)) % (len(data_loader) * args.batch_size * args.epochs * 0.05) == 0:
             torch.save({
@@ -153,19 +151,29 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
             }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
 
 
-def format_log(max_value, current_value):
-    max_length = len(str(max_value))
-    current_length = len(str(current_value))
-
-    difference = max_length - current_length
-
-    output = ''
-    for d in range(difference):
-        output += '0'
-    output += str(current_value)
-    return output
+def save_disparity(disparity, file_name):
+    multiplier = 255.0 / torch.max(disparity)
+    disparity_output = disparity * multiplier
+    disparity_output = disparity_output[0,0,:,:].detach().cpu().numpy()
+    cv2.imwrite(file_name, disparity_output)
+    # image_output = image[0,:,:,:].detach().cpu().numpy().transpose(1,2,0) * 255
+    # cv2.imwrite(f'./logs/{file_name}-image.jpg', image_output)
 
 
+def pad_current_step(max_steps, current_step):
+    max_digits = len(str(max_steps))
+    current_digits = len(str(current_step))
+
+    pads_count = max_digits - current_digits
+
+    padded_step = ''
+    for d in range(pads_count):
+        padded_step += '0'
+    padded_step += str(current_step)
+    return padded_step
+
+
+# TODO: Save validation loss and accuracy
 def valid(model, device, data_loader):
     pass
 
