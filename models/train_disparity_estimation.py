@@ -90,7 +90,8 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
 
     for batch_idx, sample_batched in enumerate(data_loader):
-        t1 = time.time()
+        if batch_idx % args.log_interval == 0:
+            t1 = time.time()
 
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
         #print(batch_idx, image.shape, depth.shape, fltFov.shape)
@@ -124,7 +125,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\nLoss: {loss.item():.2f}\n{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
@@ -142,13 +143,11 @@ def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
     estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
     left_epochs = args.epochs + 1 - epoch
 
-    # logs
     tps = f'{time_per_sample:.2f} s/sample'
     eta_d = estimated_time_arrival // (60 * 60 * 24)
     eta_hms = time.strftime('%Hh %Mm %Ss', time.gmtime(int(estimated_time_arrival)))
-    eta = f'{tps}\tETA ({left_epochs} Epochs): {eta_d:.0f}d {eta_hms}'
 
-    return eta
+    return f'{tps}\nETA ({left_epochs} Epochs): {eta_d:.0f}d {eta_hms}'
 
 def save_disparity(disparity, file_name):
     disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
