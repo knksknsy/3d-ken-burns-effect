@@ -37,7 +37,6 @@ def gh(tensor, h, y, x):
         return torch.FloatTensor(np.zeros(shape=(2, tensor.shape[0]))).cuda()
 
     vec_first_element = torch.div(
-        # y+h > tensor.shape[1] => y
         torch.sub(tensor[:, :, y+h, x], tensor[:, :, y, x]),
         torch.add(abs(tensor[:, :, y+h, x]), abs(tensor[:, :, y, x])))
     vec_second_element = torch.div(
@@ -86,11 +85,12 @@ def loss_depth(output, target):
 
 
 # TODO: continue training from latest checkpoint
-# TODO: collect accuracy and loss for plots
+# TODO: collect metrics for plots
 def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
     model.train()
 
     for batch_idx, sample_batched in enumerate(data_loader):
+        t1 = time.time()
 
         image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
         #print(batch_idx, image.shape, depth.shape, fltFov.shape)
@@ -104,7 +104,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         progress = 100. * current_step / total_steps
 
         # forward pass through Semantics() network
-        with torch.no_grad():
+        with torch.no_grad(): # disable calculation of gradients
             semanticsOutput = semanticsModel(image)
         
         disparity = model(image, semanticsOutput)
@@ -115,20 +115,20 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         loss.backward()
         optimizer.step()
 
-        # format file names
-        file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
-
         # log loss and progress
         if batch_idx % args.log_interval == 0:
-            # log progress and loss
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}', end='\r')
-
             # save output and input of model as JPEG
+            file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
             save_disparity(disparity, file_name=f'./logs/{file_name}-disparity.jpg')
             save_image(image, file_name=f'./logs/{file_name}-image.jpg')
+
+            t2 = time.time()
+            eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.6f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
-        if batch_idx % (len(data_loader) * 0.05) == 0:
+        if batch_idx % int((len(data_loader) * 0.05)) == 0:
+            file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -136,6 +136,19 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
                 'loss': loss,
             }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
 
+
+def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
+    time_per_sample = (t2 - t1) / (args.batch_size * args.log_interval)
+    estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
+    left_epochs = args.epochs + 1 - epoch
+
+    # logs
+    tps = f'{time_per_sample:.2f} s/sample'
+    eta_d = estimated_time_arrival // (60 * 60 * 24)
+    eta_hms = time.strftime('%Hh %Mm %Ss', time.gmtime(int(estimated_time_arrival)))
+    eta = f'{tps}\tETA ({left_epochs} Epochs): {eta_d:.0f}d {eta_hms}'
+
+    return eta
 
 def save_disparity(disparity, file_name):
     disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
@@ -162,7 +175,7 @@ def pad_current_step(max_steps, current_step):
     return padded_step
 
 
-# TODO: Save validation loss and accuracy
+# TODO: Save validation metrics
 def valid(model, device, data_loader):
     pass
 
@@ -191,7 +204,9 @@ def parse_args():
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--checkpoints-path', action='store',
-                        type=str, default='model_checkpoints', help='Path to save model checkpoints')
+                        type=str, default='../model_checkpoints', help='Path to save model checkpoints')
+    parser.add_argument('--logs-path', action='store',
+                        type=str, default='../logs', help='Path to save logs')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
     parser.add_argument('--valid-size', type=float, default=0.01, metavar='VS',
@@ -208,6 +223,10 @@ def main():
     # create directory for model checkpoints
     if not os.path.exists(args.checkpoints_path):
         os.mkdir(args.checkpoints_path)
+
+    # create directory for logs
+    if not os.path.exists(args.logs_path):
+        os.mkdir(args.logs_path)
 
     torch.manual_seed(args.seed)
     device = torch.device("cuda")

@@ -1,5 +1,5 @@
 models/*.pytorch
 videos/
 images/autozoom/
-checkpoints/
+model_checkpoints/
 logs/
