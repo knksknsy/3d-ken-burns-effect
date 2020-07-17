@@ -141,7 +141,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
 
 def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
-    time_per_sample = (t2 - t1) / (args.batch_size * args.log_interval)
+    time_per_sample = (t2 - t1) / args.batch_size
     estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
     left_epochs = args.epochs + 1 - epoch
 
