@@ -98,11 +98,6 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
         # reset previously calculated gradients (deallocate memory)
         optimizer.zero_grad()
-        
-        # prepare logs
-        current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
-        total_steps = len(data_loader) * args.batch_size
-        progress = 100. * current_step / total_steps
 
         # forward pass through Semantics() network
         with torch.no_grad(): # disable calculation of gradients
@@ -118,6 +113,10 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
         # log loss and progress
         if batch_idx % args.log_interval == 0:
+            current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
+            total_steps = len(data_loader) * args.batch_size
+            progress = 100. * current_step / total_steps
+
             # save output and input of model as JPEG
             file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
             logs_path = os.path.join(args.logs_path, file_name)
@@ -130,7 +129,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
+            current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
             file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
+
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -140,7 +141,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
 
 def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
-    time_per_sample = (t2 - t1) / args.batch_size
+    time_per_sample = (t2 - t1) / (args.batch_size * args.log_interval)
     estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
     left_epochs = args.epochs + 1 - epoch
 
