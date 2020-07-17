@@ -120,8 +120,9 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         if batch_idx % args.log_interval == 0:
             # save output and input of model as JPEG
             file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
-            save_disparity(disparity, file_name=f'./logs/{file_name}-disparity.jpg')
-            save_image(image, file_name=f'./logs/{file_name}-image.jpg')
+            logs_path = os.path.join(args.logs_path, file_name)
+            save_disparity(disparity, file_name=f'{logs_path}-disparity.jpg')
+            save_disparity(depth, file_name=f'{logs_path}-depth.jpg')
 
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
@@ -139,7 +140,7 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
 
 
 def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
-    time_per_sample = (t2 - t1) / (args.batch_size * args.log_interval)
+    time_per_sample = (t2 - t1) / args.batch_size
     estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
     left_epochs = args.epochs + 1 - epoch
 
@@ -153,12 +154,6 @@ def save_disparity(disparity, file_name):
     disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
     disparity_out = disparity_out.detach().cpu().numpy()
     cv2.imwrite(file_name, disparity_out)
-
-
-def save_image(image, file_name):
-    image_output = image[0,:,:,:].detach().cpu().numpy()
-    image_output = image_output.transpose(1,2,0) * 255
-    cv2.imwrite(file_name, image_output)
 
 
 def pad_current_step(max_steps, current_step):
