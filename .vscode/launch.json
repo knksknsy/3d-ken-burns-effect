@@ -37,7 +37,7 @@
             "request": "launch",
             "program": "./models/train_disparity_estimation.py",
             "console": "integratedTerminal",
-            "args": ["--dataset", "D:\\3d-ken-burns-dataset", "--batch-size", "2", "--valid-size", "0", "--log-interval", "2"],
+            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "2", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "1"],
             "justMyCode": true
         },
         {

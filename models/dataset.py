@@ -17,12 +17,6 @@ class ImageDepthDataset(Dataset):
         Args:
             csv_file (string): Path to the csv file with annotations.
             dataset_path (string): Directory to dataset.
-            batch_size (int): Batch size for training set
-            valid_batch_size (int): Batch size for validation set
-            valid_size (float): Size of validation set
-            seed (int): Numpy seed for reproducability
-            num_workers (int): Number of workers for multiprocessing. Disabled on Windows => num_workers=0
-            pin_memory (bool): Speeds-up the transfer of dataset between CPU and GPU
             transform (callable, optional): Optional transform to be applied on a sample.
         """
         self.dataset_frame = pd.read_csv(csv_file)
@@ -30,12 +24,20 @@ class ImageDepthDataset(Dataset):
         self.transform = transform
 
     def get_train_valid_loader(self, batch_size, valid_batch_size, valid_size, seed, num_workers, pin_memory):
+        """
+        Args:
+            batch_size (int): Batch size for training set
+            valid_batch_size (int): Batch size for validation set
+            valid_size (float): Size of validation set
+            seed (int): Numpy seed for reproducability
+            num_workers (int): Number of workers for multiprocessing. Disabled on Windows => num_workers=0
+            pin_memory (bool): Speeds-up the transfer of dataset between CPU and GPU
+        """
         train_dataset = self
         valid_dataset = copy.deepcopy(train_dataset)
         num_train = len(train_dataset)
         indices = list(range(num_train))
-        assert ((valid_size >= 0) and (valid_size <= 1)
-                ), 'valid-size should be in the range [0, 1].'
+        assert ((valid_size >= 0) and (valid_size <= 1)), 'valid-size should be in the range [0, 1].'
         split = int(np.floor(valid_size * num_train))
         np.random.seed(seed)
         np.random.shuffle(indices)
@@ -44,10 +46,8 @@ class ImageDepthDataset(Dataset):
         train_sampler = SubsetRandomSampler(train_idx)
         valid_sampler = SubsetRandomSampler(valid_idx)
 
-        train_loader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size,
-                                  num_workers=num_workers, pin_memory=pin_memory)
-        valid_loader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=batch_size,
-                                  num_workers=num_workers, pin_memory=pin_memory)
+        train_loader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
+        valid_loader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
 
         return train_loader, valid_loader
 

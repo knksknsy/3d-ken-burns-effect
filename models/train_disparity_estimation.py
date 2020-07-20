@@ -1,5 +1,5 @@
 from disparity_estimation import Disparity, Semantics
-from transforms import ToTensor, DownscaleDepth
+from transforms import ToTensor, DownscaleDepth, RandomRescaleCrop
 from dataset import ImageDepthDataset
 
 import cupy
@@ -12,82 +12,97 @@ from cv2 import cv2
 import os
 import time
 
+device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
+
+def load_model(model, models_path, continue_training=False):
+    iter_nb = 0
+
+    # Get latest model .pt files in directory models_path
+    model_path = [f for f in os.listdir(models_path) if f.endswith('.pt')][-1]
+    checkpoint = torch.load(model_path)
+    model['model'].load_state_dict(checkpoint['model_state_dict'])
+
+    if continue_training:
+        model['opt'].load_state_dict(checkpoint[f'optimizer_{model["type"]}_state_dict'])
+        model['schedule'].load_state_dict(checkpoint[f'scheduler_{model["type"]}_state_dict'])
+        iter_nb = checkpoint['iter_nb']
+        print(f'Model {model["type"]} loaded succesfully.')
+
+    return iter_nb
+
+
+def save_model(models_dict, iter_nb, path):
+    for model_type, model in models_dict.items():
+        torch.save({
+            'iter_nb': iter_nb,
+            'model_state_dict': model['model'].state_dict(),
+            f'optimizer_{model_type}_state_dict': model['opt'].state_dict(),
+            f'scheduler_{model_type}_state_dict': model['schedule'].state_dict()},
+            os.path.join(path, model['file_name']))
+
 
 def get_optimizer(parameters, lr, betas):
     return torch.optim.Adam(parameters, lr=lr, betas=betas)
 
 
-def loss_ord(output, target):
-    loss = torch.FloatTensor(np.zeros(shape=(output.shape[0], 1))).cuda()
-    x_dim = range(output.size()[2])
-    y_dim = range(output.size()[1])
-
-    for y in y_dim:
-        for x in x_dim:
-            loss += torch.abs(torch.sub(output[:, :, y, x], target[:, :, y, x]))
-
-    return loss
-
-
-def gh(tensor, h, y, x):
-    # ignore NaN values
-    x_dim = tensor.shape[3]
-    y_dim = tensor.shape[2]
-    if (y + h >= y_dim) or (x + h >= x_dim):
-        return torch.FloatTensor(np.zeros(shape=(2, tensor.shape[0]))).cuda()
-
-    vec_first_element = torch.div(
-        torch.sub(tensor[:, :, y+h, x], tensor[:, :, y, x]),
-        torch.add(abs(tensor[:, :, y+h, x]), abs(tensor[:, :, y, x])))
-    vec_second_element = torch.div(
-        torch.sub(tensor[:, :, y, x+h], tensor[:, :, y, x]),
-        torch.add(abs(tensor[:, :, y, x+h]), abs(tensor[:, :, y, x])))
-
-    vec = torch.cat((vec_first_element.t(), vec_second_element.t()), dim=0)
-    return vec
-
-
-def l2_norm(tensor):
-    batch_dim = range(tensor.shape[1])
-
-    l2_norms = torch.FloatTensor(np.zeros(shape=(tensor.shape[1], 1))).cuda()
-
-    for b in batch_dim:
-        l2_norms[b] = torch.sqrt(torch.pow(tensor[0][b], 2) + torch.pow(tensor[1][b], 2))
+# Create kernels used for gradient computation
+def get_kernels(h):
+    kernel_elements = [-1] + [0 for _ in range(h-1)] + [1]
+    kernel_elements_div = [1] + [0 for _ in range(h-1)] + [1]
+    weight_y = torch.Tensor(kernel_elements).view(1,-1)
+    weight_x = weight_y.T
     
-    return l2_norms
+    weight_y_norm = torch.Tensor(kernel_elements_div).view(1,-1)
+    weight_x_norm = weight_y_norm.T
+    
+    return weight_x.to(device), weight_x_norm.to(device), weight_y.to(device), weight_y_norm.to(device)
 
 
-def loss_grad(output, target):
-    h_values = [pow(2, i) for i in range(0, 5)]
-    loss = torch.FloatTensor(np.zeros(shape=(output.shape[0], 1))).cuda()
-    x_dim = range(output.shape[2])
-    y_dim = range(output.shape[1])
+def derivative_scale(tensor, h, norm=True):
+    kernel_x, kernel_x_norm, kernel_y, kernel_y_norm = get_kernels(h)
+    
+    diff_x = torch.nn.functional.conv2d(tensor, kernel_x.view(1,1,-1,1))
+    diff_y = torch.nn.functional.conv2d(tensor, kernel_y.view(1,1,1,-1))
 
-    for h in h_values:
-        for y in y_dim:
-            for x in x_dim:
-                loss += l2_norm(
-                    torch.sub(
-                        gh(output, h, y, x),
-                        gh(target, h, y, x)
-                    )
-                )
+    if norm:
+        norm_x = torch.nn.functional.conv2d(torch.abs(tensor), kernel_x_norm.view(1,1,-1,1))
+        norm_y = torch.nn.functional.conv2d(torch.abs(tensor), kernel_y_norm.view(1,1,1,-1))
+        diff_x = diff_x/(norm_x + 1e-7)
+        diff_y = diff_y/(norm_y + 1e-7)
+    
+    return torch.nn.functional.pad(diff_x, (0, 0, h, 0)), torch.nn.functional.pad(diff_y, (h, 0, 0, 0))
+
+
+def compute_loss_ord(disparity, target, mask):
+    L1Loss = torch.nn.L1Loss(reduction='sum')
+
+    loss = 0
+    N = torch.sum(mask)
+    
+    if N != 0:
+        loss = L1Loss(disparity * mask, target * mask) / N
+    return loss
+
+
+def compute_loss_grad(disparity, target, mask):        
+    scales = [2**i for i in range(4)]
+    MSELoss = torch.nn.MSELoss(reduction='sum')
+
+    loss = 0
+    for h in scales:
+        g_h_disparity_x, g_h_disparity_y = derivative_scale(disparity, h, norm=True)
+        g_h_target_x, g_h_target_y = derivative_scale(target, h, norm=True)
+        N = torch.sum(mask)
+
+        if N != 0:
+            loss += MSELoss(g_h_disparity_x * mask, g_h_target_x * mask) / N
+            loss += MSELoss(g_h_disparity_y * mask, g_h_target_y * mask) / N
 
     return loss
 
 
-def loss_depth(output, target):
-    return torch.add(
-        torch.mul(0.0001, loss_ord(output, target)),
-        loss_grad(output, target)
-    )
-
-
-# TODO: continue training from latest checkpoint
 # TODO: collect metrics for plots
-def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
-    model.train()
+def train(args, disparityModel, semanticsModel, data_loader, optimizer, scheduler, epoch, iter_nb):
 
     for batch_idx, sample_batched in enumerate(data_loader):
         if batch_idx % args.log_interval == 0:
@@ -103,41 +118,59 @@ def train(args, model, semanticsModel, device, data_loader, optimizer, epoch):
         with torch.no_grad(): # disable calculation of gradients
             semanticsOutput = semanticsModel(image)
         
-        disparity = model(image, semanticsOutput)
+        disparity = disparityModel(image, semanticsOutput)
         disparity = torch.nn.functional.threshold(disparity, threshold=0.0, value=0.0)
 
-        # calculate loss
-        loss = loss_depth(disparity, depth).mean()
-        loss.backward()
-        optimizer.step()
+        # reconstruction loss computation
+        mask = torch.ones(depth.shape).to(device)
+        loss_ord = compute_loss_ord(disparity, depth, mask)
+        loss_grad = compute_loss_grad(disparity, depth, mask)
 
-        # log loss and progress
+        # loss weights computation
+        beta = 0.015
+        # gamma_ord = 0.03 * (1 + 2 * np.exp(-beta * iter_nb)) # for scale-invariant Loss 
+        gamma_ord = 0.001 * (1 + 200 * np.exp( - beta * iter_nb)) # for L1 loss
+        gamma_grad = 1 - np.exp(-beta * iter_nb)
+
+        loss_depth = gamma_ord * loss_ord + gamma_grad * loss_grad # Niklaus' paper => 0.0001 * loss_ord + loss_grad
+        loss_depth.backward()
+        torch.nn.utils.clip_grad_norm_(disparityModel.parameters(), 1)
+        optimizer.step()
+        scheduler.step()
+
+        # print loss and progress
         if batch_idx % args.log_interval == 0:
             current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
             total_steps = len(data_loader) * args.batch_size
             progress = 100. * current_step / total_steps
 
             # save output and input of model as JPEG
-            file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
+            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}'
             logs_path = os.path.join(args.logs_path, file_name)
             save_disparity(disparity, file_name=f'{logs_path}-disparity.jpg')
             save_disparity(depth, file_name=f'{logs_path}-depth.jpg')
 
+            # compute estimated time of arrival
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss.item():.2f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.2f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
             current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
-            file_name = f'{epoch}-{pad_current_step(total_steps, current_step)}-{loss:.2f}'
-
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss,
-            }, os.path.join(args.checkpoints_path, f'{file_name}.pt'))
+            total_steps = len(data_loader) * args.batch_size
+            model = {
+                'disparity': {
+                    'model':disparityModel,
+                    'opt':optimizer,
+                    'schedule': scheduler,
+                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}.pt'
+                }
+            }
+            save_model(model, iter_nb, args.models_path)
+    
+    iter_nb += 1
+    return iter_nb
 
 
 def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
@@ -157,21 +190,20 @@ def save_disparity(disparity, file_name):
     cv2.imwrite(file_name, disparity_out)
 
 
-def pad_current_step(max_steps, current_step):
-    max_digits = len(str(max_steps))
-    current_digits = len(str(current_step))
-
+def pad_number(max_number, current_number):
+    max_digits = len(str(max_number))
+    current_digits = len(str(current_number))
     pads_count = max_digits - current_digits
 
     padded_step = ''
     for d in range(pads_count):
         padded_step += '0'
-    padded_step += str(current_step)
+    padded_step += str(current_number)
     return padded_step
 
 
 # TODO: Save validation metrics
-def valid(model, device, data_loader):
+def valid(model, data_loader):
     pass
 
 
@@ -190,6 +222,8 @@ def parse_args():
                         help='beta 1 for adam optimizer (default: 0.9)')
     parser.add_argument('--b2', type=float, default=0.999, metavar='B2',
                         help='beta 1 for adam optimizer (default: 0.999)')
+    parser.add_argument('--gamma_lr', type=float, default=0.99999, metavar='GLR',
+                        help='Sets the learning rate of each parameter group to the initial lr times the gamma_lr value.')
     parser.add_argument('--seed', type=int, default=1,
                         metavar='S', help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -198,7 +232,7 @@ def parse_args():
                         default=False, help='For Saving the current Model')
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
-    parser.add_argument('--checkpoints-path', action='store',
+    parser.add_argument('--models-path', action='store',
                         type=str, default='../model_checkpoints', help='Path to save model checkpoints')
     parser.add_argument('--logs-path', action='store',
                         type=str, default='../logs', help='Path to save logs')
@@ -208,6 +242,8 @@ def parse_args():
                         help='Set size of the validation dataset: e.g.: valid-size=0.01 => train-size=0.99')
     parser.add_argument('--pin-memory', action='store_true', default=False,
                         help='Speeds-up the transfer of dataset between CPU and GPU')
+    parser.add_argument('--continue_training', action='store_true', default=False,
+                        help='Training is continued from saved model checkpoints saved in --checkpoints-path argument)')
     return parser.parse_args()
 
 
@@ -216,18 +252,17 @@ def main():
     args = parse_args()
 
     # create directory for model checkpoints
-    if not os.path.exists(args.checkpoints_path):
-        os.mkdir(args.checkpoints_path)
+    if not os.path.exists(args.models_path):
+        os.mkdir(args.models_path)
 
     # create directory for logs
     if not os.path.exists(args.logs_path):
-        os.mkdir(args.logs_path)
+        os.mkdir(args.logs_path)   
 
     torch.manual_seed(args.seed)
-    device = torch.device("cuda")
 
     # get train and valid dataset
-    transform = transforms.Compose([DownscaleDepth(), ToTensor()])
+    transform = transforms.Compose([DownscaleDepth(), RandomRescaleCrop(args.batch_size), ToTensor()])
     dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
 
     train_loader, valid_loader = dataset.get_train_valid_loader(
@@ -239,17 +274,29 @@ def main():
         args.pin_memory
     )
 
-    model = Disparity().to(device)
+    iter_nb = 0
+
+    disparityModel = Disparity().to(device).eval()
     semanticsModel = Semantics().to(device).eval()
 
-    optimizer = get_optimizer(model.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    optimizer = get_optimizer(disparityModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    lambda_lr = lambda epoch: args.gamma_lr ** epoch
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_lr)
+
+    # load model checkpoint for continuing training
+    if args.continue_training:
+        print(f'Loading model state from {str(args.models_path)}')
+        model = {'model': disparityModel, 'type': 'disparity', 'opt': optimizer, 'schedule': scheduler}
+        iter_nb = load_model(model, args.models_path, continue_training=args.continue_training)
+
+    disparityModel.train()
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, semanticsModel, device, train_loader, optimizer, epoch)
-        valid(model, device, valid_loader)
+        iter_nb += train(args, disparityModel, semanticsModel, train_loader, optimizer, scheduler, epoch, iter_nb)
+        valid(disparityModel, valid_loader)
 
     if args.save_model:
-        torch.save(model.state_dict(), "stdl_disparity_estimation.pt")
+        torch.save(disparityModel.state_dict(), "stdl_disparity_estimation.pt")
 
 
 if __name__ == "__main__":
