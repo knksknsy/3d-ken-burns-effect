@@ -126,13 +126,14 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
         loss_ord = compute_loss_ord(disparity, depth, mask)
         loss_grad = compute_loss_grad(disparity, depth, mask)
 
-        # loss weights computation
-        beta = 0.015
-        # gamma_ord = 0.03 * (1 + 2 * np.exp(-beta * iter_nb)) # for scale-invariant Loss 
-        gamma_ord = 0.001 * (1 + 200 * np.exp( - beta * iter_nb)) # for L1 loss
-        gamma_grad = 1 - np.exp(-beta * iter_nb)
+        # # loss weights computation
+        # beta = 0.015
+        # # gamma_ord = 0.03 * (1 + 2 * np.exp(-beta * iter_nb)) # for scale-invariant Loss 
+        # gamma_ord = 0.001 * (1 + 200 * np.exp( - beta * iter_nb)) # for L1 loss
+        # gamma_grad = 1 - np.exp(-beta * iter_nb)
 
-        loss_depth = gamma_ord * loss_ord + gamma_grad * loss_grad # Niklaus' paper => 0.0001 * loss_ord + loss_grad
+        # loss_depth = gamma_ord * loss_ord + gamma_grad * loss_grad # Niklaus' paper => 0.0001 * loss_ord + loss_grad
+        loss_depth = 0.0001 * loss_ord + loss_grad
         loss_depth.backward()
         torch.nn.utils.clip_grad_norm_(disparityModel.parameters(), 1)
         optimizer.step()
