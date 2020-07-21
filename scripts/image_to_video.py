@@ -21,7 +21,7 @@ class Images2Video:
             os.mkdir(self.output_path)
 
     def generate(self):
-        video_name = str(self.data_path).split(os.path.sep)[-1].replace('.zip', '.avi')
+        video_name = str(self.data_path).split(os.path.sep)[-1].replace('.zip', '.mp4')
         video_path = Path(os.path.join(self.output_path,video_name))
         print(f'video_path: {video_path}')
 
@@ -45,7 +45,7 @@ class Images2Video:
         frame = cv2.imdecode(numpy.frombuffer(frame_data, numpy.uint8), 1)
         height, width, layers = frame.shape
 
-        video = cv2.VideoWriter(video_path, 0, 5, (width,height))
+        video = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'MP4V'), 5, (width,height))
         images.sort()
         pbar = tqdm(zip(*[iter(images)]*4))
 

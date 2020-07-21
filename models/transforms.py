@@ -21,7 +21,6 @@ class ToTensor(object):
         return {'image': image, 'depth': depth, 'fltFov': fltFov}
 
 
-# TODO: rescale image too?
 class DownscaleDepth(object):
     """Downscale target depth by factor 2"""
 

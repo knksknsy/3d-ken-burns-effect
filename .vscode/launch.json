@@ -19,7 +19,7 @@
             "request": "launch",
             "program": "./depthestim.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/doublestrike.jpg", "--out", "./depthestim.npy"],
+            "args": ["--in", "./images/doublestrike.jpg", "--out", "./images/doublestrike-depth.npy"],
             "justMyCode": true
         },
         {
@@ -38,6 +38,24 @@
             "program": "./models/train_disparity_estimation.py",
             "console": "integratedTerminal",
             "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "2", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "1"],
+            "justMyCode": true
+        },
+        {
+            "name": "train_disparity_refinement.py",
+            "type": "python",
+            "request": "launch",
+            "program": "./models/train_disparity_refinement.py",
+            "console": "integratedTerminal",
+            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "1", "--valid-size", "0", "--models-path", "model_checkpoints", "--disparity-path", "models/disparity_estimation.pytorch", "--logs-path", "logs", "--log-interval", "1"],
+            "justMyCode": true
+        },
+        {
+            "name": "point_cloud.py",
+            "type": "python",
+            "request": "launch",
+            "program": "./point_cloud.py",
+            "console": "integratedTerminal",
+            "args": ["--in", "./images/test-image.png", "--out", "./images/test-depth.npy"],
             "justMyCode": true
         },
         {
