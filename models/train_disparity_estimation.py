@@ -1,6 +1,8 @@
 from disparity_estimation import Disparity, Semantics
 from transforms import ToTensor, DownscaleDepth, RandomRescaleCrop
 from dataset import ImageDepthDataset
+from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad
+from utils import load_model, save_model, get_eta_string, save_log, pad_number
 
 import cupy
 import torch
@@ -13,93 +15,6 @@ import os
 import time
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
-
-def load_model(model, models_path, continue_training=False):
-    iter_nb = 0
-
-    # Get latest model .pt files in directory models_path
-    model_path = [f for f in os.listdir(models_path) if f.endswith('.pt')][-1]
-    checkpoint = torch.load(model_path)
-    model['model'].load_state_dict(checkpoint['model_state_dict'])
-
-    if continue_training:
-        model['opt'].load_state_dict(checkpoint[f'optimizer_{model["type"]}_state_dict'])
-        model['schedule'].load_state_dict(checkpoint[f'scheduler_{model["type"]}_state_dict'])
-        iter_nb = checkpoint['iter_nb']
-        print(f'Model {model["type"]} loaded succesfully.')
-
-    return iter_nb
-
-
-def save_model(models_dict, iter_nb, path):
-    for model_type, model in models_dict.items():
-        torch.save({
-            'iter_nb': iter_nb,
-            'model_state_dict': model['model'].state_dict(),
-            f'optimizer_{model_type}_state_dict': model['opt'].state_dict(),
-            f'scheduler_{model_type}_state_dict': model['schedule'].state_dict()},
-            os.path.join(path, model['file_name']))
-
-
-def get_optimizer(parameters, lr, betas):
-    return torch.optim.Adam(parameters, lr=lr, betas=betas)
-
-
-# Create kernels used for gradient computation
-def get_kernels(h):
-    kernel_elements = [-1] + [0 for _ in range(h-1)] + [1]
-    kernel_elements_div = [1] + [0 for _ in range(h-1)] + [1]
-    weight_y = torch.Tensor(kernel_elements).view(1,-1)
-    weight_x = weight_y.T
-    
-    weight_y_norm = torch.Tensor(kernel_elements_div).view(1,-1)
-    weight_x_norm = weight_y_norm.T
-    
-    return weight_x.to(device), weight_x_norm.to(device), weight_y.to(device), weight_y_norm.to(device)
-
-
-def derivative_scale(tensor, h, norm=True):
-    kernel_x, kernel_x_norm, kernel_y, kernel_y_norm = get_kernels(h)
-    
-    diff_x = torch.nn.functional.conv2d(tensor, kernel_x.view(1,1,-1,1))
-    diff_y = torch.nn.functional.conv2d(tensor, kernel_y.view(1,1,1,-1))
-
-    if norm:
-        norm_x = torch.nn.functional.conv2d(torch.abs(tensor), kernel_x_norm.view(1,1,-1,1))
-        norm_y = torch.nn.functional.conv2d(torch.abs(tensor), kernel_y_norm.view(1,1,1,-1))
-        diff_x = diff_x/(norm_x + 1e-7)
-        diff_y = diff_y/(norm_y + 1e-7)
-    
-    return torch.nn.functional.pad(diff_x, (0, 0, h, 0)), torch.nn.functional.pad(diff_y, (h, 0, 0, 0))
-
-
-def compute_loss_ord(disparity, target, mask):
-    L1Loss = torch.nn.L1Loss(reduction='sum')
-
-    loss = 0
-    N = torch.sum(mask)
-    
-    if N != 0:
-        loss = L1Loss(disparity * mask, target * mask) / N
-    return loss
-
-
-def compute_loss_grad(disparity, target, mask):        
-    scales = [2**i for i in range(4)]
-    MSELoss = torch.nn.MSELoss(reduction='sum')
-
-    loss = 0
-    for h in scales:
-        g_h_disparity_x, g_h_disparity_y = derivative_scale(disparity, h, norm=True)
-        g_h_target_x, g_h_target_y = derivative_scale(target, h, norm=True)
-        N = torch.sum(mask)
-
-        if N != 0:
-            loss += MSELoss(g_h_disparity_x * mask, g_h_target_x * mask) / N
-            loss += MSELoss(g_h_disparity_y * mask, g_h_target_y * mask) / N
-
-    return loss
-
 
 # TODO: collect metrics for plots
 def train(args, disparityModel, semanticsModel, data_loader, optimizer, scheduler, epoch, iter_nb):
@@ -148,8 +63,8 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
             # save output and input of model as JPEG
             file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}'
             logs_path = os.path.join(args.logs_path, file_name)
-            save_disparity(disparity, file_name=f'{logs_path}-disparity.jpg')
-            save_disparity(depth, file_name=f'{logs_path}-depth.jpg')
+            save_log(disparity, file_name=f'{logs_path}-disparity.jpg')
+            save_log(depth, file_name=f'{logs_path}-depth.jpg')
 
             # compute estimated time of arrival
             t2 = time.time()
@@ -172,35 +87,6 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
     
     iter_nb += 1
     return iter_nb
-
-
-def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
-    time_per_sample = (t2 - t1) / args.batch_size
-    estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
-    left_epochs = args.epochs + 1 - epoch
-
-    tps = f'{time_per_sample:.2f} s/sample'
-    eta_d = estimated_time_arrival // (60 * 60 * 24)
-    eta_hms = time.strftime('%Hh %Mm %Ss', time.gmtime(int(estimated_time_arrival)))
-
-    return f'{tps}\tETA ({left_epochs} Epochs): {eta_d:.0f}d {eta_hms}'
-
-def save_disparity(disparity, file_name):
-    disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
-    disparity_out = disparity_out.detach().cpu().numpy()
-    cv2.imwrite(file_name, disparity_out)
-
-
-def pad_number(max_number, current_number):
-    max_digits = len(str(max_number))
-    current_digits = len(str(current_number))
-    pads_count = max_digits - current_digits
-
-    padded_step = ''
-    for d in range(pads_count):
-        padded_step += '0'
-    padded_step += str(current_number)
-    return padded_step
 
 
 # TODO: Save validation metrics
@@ -227,10 +113,8 @@ def parse_args():
                         help='Sets the learning rate of each parameter group to the initial lr times the gamma_lr value.')
     parser.add_argument('--seed', type=int, default=1,
                         metavar='S', help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=1000, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true',
-                        default=False, help='For Saving the current Model')
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--models-path', action='store',
@@ -280,7 +164,7 @@ def main():
     disparityModel = Disparity().to(device).eval()
     semanticsModel = Semantics().to(device).eval()
 
-    optimizer = get_optimizer(disparityModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    optimizer = torch.optim.Adam(disparityModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
     lambda_lr = lambda epoch: args.gamma_lr ** epoch
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_lr)
 
@@ -295,9 +179,6 @@ def main():
     for epoch in range(1, args.epochs + 1):
         iter_nb += train(args, disparityModel, semanticsModel, train_loader, optimizer, scheduler, epoch, iter_nb)
         valid(disparityModel, valid_loader)
-
-    if args.save_model:
-        torch.save(disparityModel.state_dict(), "stdl_disparity_estimation.pt")
 
 
 if __name__ == "__main__":
