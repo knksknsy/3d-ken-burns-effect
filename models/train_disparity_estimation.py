@@ -39,7 +39,7 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
         # reconstruction loss computation
         mask = torch.ones(depth.shape).to(device)
         loss_ord = compute_loss_ord(disparity, depth, mask)
-        loss_grad = compute_loss_grad(disparity, depth, mask)
+        loss_grad = compute_loss_grad(disparity, depth, mask, args)
 
         # # loss weights computation
         # beta = 0.015

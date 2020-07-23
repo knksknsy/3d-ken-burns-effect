@@ -41,7 +41,7 @@ def train(args, refinementModel, disparityModel, semanticsModel, data_loader, op
         # reconstruction loss computation
         mask = torch.ones(depth.shape).to(device)
         loss_ord = compute_loss_ord(refined_disparity, depth, mask)
-        loss_grad = compute_loss_grad(refined_disparity, depth, mask)
+        loss_grad = compute_loss_grad(refined_disparity, depth, mask, device)
 
         loss_depth = 0.0001 * loss_ord + loss_grad
         loss_depth.backward()
