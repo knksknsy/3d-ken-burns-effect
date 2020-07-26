@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "autozoom.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/doublestrike.jpg", "--out", "./videos/autozoom.mp4"],
+            "args": ["--in", "./images/corridor.jpg", "--out", "./videos/corridor.mp4"],
             "justMyCode": true
         },
         {
@@ -55,7 +55,7 @@
             "request": "launch",
             "program": "./point_cloud.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/test-image.png", "--out", "./images/test-depth.npy"],
+            "args": ["--image", "./images/test/00001-bl-image.png", "--depth", "./images/test/00001-bl-depth.exr", "--meta", "./images/test/00001-meta.json"],
             "justMyCode": true
         },
         {

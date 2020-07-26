@@ -176,7 +176,7 @@ def process_autozoom(objSettings):
 
 			tenRender, tenExisting = render_pointcloud(tenPoints, objCommon['tenRawImage'].view(1, 3, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
-			# TODO
+			# # TODO
 			# tenRenderOut = tenRender[0,:, :, :].cpu().numpy()
 			# tenRenderOut = (tenRenderOut * 255).astype(numpy.uint8)
 			# tenRenderOut = tenRenderOut.transpose(1,2,0)
@@ -257,11 +257,20 @@ def process_kenburns(objSettings):
 
 		tenRender, tenExisting = render_pointcloud(tenPoints, torch.cat([ objCommon['tenInpaImage'], objCommon['tenInpaDepth'] ], 1).view(1, 4, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
+		# TODO
+		# tenRenderOut = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+		# tenRenderOut = cv2.getRectSubPix(image=tenRenderOut, patchSize=(max(objSettings['objFrom']['intCropWidth'], objSettings['objTo']['intCropWidth']), max(objSettings['objFrom']['intCropHeight'], objSettings['objTo']['intCropHeight'])), center=(objCommon['intWidth'] / 2.0, objCommon['intHeight'] / 2.0))
+		# tenRenderOut = cv2.resize(src=tenRenderOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+		# cv2.imwrite(f'./images/autozoom/kbe/render/{fltStep:.4f}.png', tenRenderOut)
+
 		tenRender = fill_disocclusion(tenRender, tenRender[:, 3:4, :, :] * (tenExisting > 0.0).float())
 
 		npyOutput = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
 		npyOutput = cv2.getRectSubPix(image=npyOutput, patchSize=(max(objSettings['objFrom']['intCropWidth'], objSettings['objTo']['intCropWidth']), max(objSettings['objFrom']['intCropHeight'], objSettings['objTo']['intCropHeight'])), center=(objCommon['intWidth'] / 2.0, objCommon['intHeight'] / 2.0))
 		npyOutput = cv2.resize(src=npyOutput, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+
+		# TODO
+		# cv2.imwrite(f'./images/autozoom/kbe/output/{fltStep:.4f}.png', npyOutput)
 
 		npyOutputs.append(npyOutput)
 	# end

@@ -132,6 +132,11 @@ class Inpaint(torch.nn.Module):
 
 		tenRender, tenExisting = render_pointcloud(tenPoints + tenShift, torch.cat([ tenImage, tenDisparity, tenContext ], 1).view(1, 68, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
+		# TODO
+		# tenRenderOut = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+		# tenRenderOut = cv2.resize(src=tenRenderOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+		# cv2.imwrite(f'./images/autozoom/kbe/no_inpainting/extreme-view-{tenShift[0][1].item():.2f}.png', tenRenderOut)
+
 		tenExisting = (tenExisting > 0.0).float()
 		tenExisting = tenExisting * spatial_filter(tenExisting, 'median-5')
 		tenRender = tenRender * tenExisting.clone().detach()

@@ -5,13 +5,13 @@ from cv2 import cv2
 import json
 
 # Create depth map
-with open('test/00001-meta.json', 'r') as json_file:
+with open('images/town-walking-depth/00001-meta.json', 'r') as json_file:
     meta_json = json.loads(json_file.read())
 
-depth1 = cv2.imread('test/00001-bl-depth.exr', cv2.IMREAD_ANYDEPTH)
-depth2 = cv2.imread('test/00001-br-depth.exr', cv2.IMREAD_ANYDEPTH)
-depth3 = cv2.imread('test/00001-tl-depth.exr', cv2.IMREAD_ANYDEPTH)
-depth4 = cv2.imread('test/00001-tr-depth.exr', cv2.IMREAD_ANYDEPTH)
+depth1 = cv2.imread('images/town-walking-depth/00001-bl-depth.exr', cv2.IMREAD_ANYDEPTH)
+depth2 = cv2.imread('images/town-walking-depth/00001-br-depth.exr', cv2.IMREAD_ANYDEPTH)
+depth3 = cv2.imread('images/town-walking-depth/00001-tl-depth.exr', cv2.IMREAD_ANYDEPTH)
+depth4 = cv2.imread('images/town-walking-depth/00001-tr-depth.exr', cv2.IMREAD_ANYDEPTH)
 
 image_shape = depth1.shape
 
@@ -24,10 +24,10 @@ depth2 = (focal * baseline) / (depth2 + 0.0000001)
 depth3 = (focal * baseline) / (depth3 + 0.0000001)
 depth4 = (focal * baseline) / (depth4 + 0.0000001)
 
-cv2.imwrite('test/output/00001-bl-depth.png', depth1.clip(0.0, 255.0).astype(np.uint8))
-cv2.imwrite('test/output/00001-br-depth.png', depth2.clip(0.0, 255.0).astype(np.uint8))
-cv2.imwrite('test/output/00001-tl-depth.png', depth3.clip(0.0, 255.0).astype(np.uint8))
-cv2.imwrite('test/output/00001-tr-depth.png', depth4.clip(0.0, 255.0).astype(np.uint8))
+cv2.imwrite('images/town-walking-depth/00001-bl-depth.png', (depth1 * 8.0).clip(0.0, 255.0).astype(np.uint8))
+cv2.imwrite('images/town-walking-depth/00001-br-depth.png', (depth2 * 8.0).clip(0.0, 255.0).astype(np.uint8))
+cv2.imwrite('images/town-walking-depth/00001-tl-depth.png', (depth3 * 8.0).clip(0.0, 255.0).astype(np.uint8))
+cv2.imwrite('images/town-walking-depth/00001-tr-depth.png', (depth4 * 8.0).clip(0.0, 255.0).astype(np.uint8))
 
 # # Render point cloud from image and depth
 # from open3d import *
