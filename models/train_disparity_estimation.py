@@ -39,7 +39,7 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
         # reconstruction loss computation
         mask = torch.ones(depth.shape).to(device)
         loss_ord = compute_loss_ord(disparity, depth, mask)
-        loss_grad = compute_loss_grad(disparity, depth, mask, args)
+        loss_grad = compute_loss_grad(disparity, depth, mask, device)
 
         # # loss weights computation
         # beta = 0.015
@@ -127,7 +127,7 @@ def parse_args():
                         help='Set size of the validation dataset: e.g.: valid-size=0.01 => train-size=0.99')
     parser.add_argument('--pin-memory', action='store_true', default=False,
                         help='Speeds-up the transfer of dataset between CPU and GPU')
-    parser.add_argument('--continue_training', action='store_true', default=False,
+    parser.add_argument('--continue-training', action='store_true', default=False,
                         help='Training is continued from saved model checkpoints saved in --checkpoints-path argument)')
     return parser.parse_args()
 

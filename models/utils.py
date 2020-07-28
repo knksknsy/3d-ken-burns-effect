@@ -10,7 +10,7 @@ def load_model(model, models_path, continue_training=False):
 
     # Get latest model .pt files in directory models_path
     model_path = [f for f in os.listdir(models_path) if f.endswith('.pt')][-1]
-    checkpoint = torch.load(model_path)
+    checkpoint = torch.load(os.path.join(models_path, model_path))
     model['model'].load_state_dict(checkpoint['model_state_dict'])
 
     if continue_training:

@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "autozoom.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/corridor.jpg", "--out", "./videos/corridor.mp4"],
+            "args": ["--in", "./images/rice.jpg", "--out", "./videos/rice.mp4"],
             "justMyCode": true
         },
         {
@@ -37,7 +37,7 @@
             "request": "launch",
             "program": "./models/train_disparity_estimation.py",
             "console": "integratedTerminal",
-            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "2", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "1"],
+            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "1", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "1"],
             "justMyCode": true
         },
         {
