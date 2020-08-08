@@ -177,6 +177,18 @@ def create_csv(dataset_path):
     data_frame.to_csv('./../dataset.csv', index=False, encoding='utf-8')
     print('Saved CSV to ./../dataset.csv')
 
+def create_csv_inpainting(dataset_csv_path):
+    df_columns = ['zip_image_path', 'zip_depth_path', 'image_tl_path', 'image_tr_path', 'image_bl_path', 'image_br_path', 'depth_tl_path', 'depth_tr_path', 'depth_bl_path', 'depth_br_path', 'fltFov']
+    data_frame = pd.DataFrame(columns=df_columns)
+
+    for i, line in enumerate(pd.read_csv(dataset_csv_path, header=0, encoding='utf-8', chunksize=4)):
+        series = pd.Series([line.iloc[0,0], line.iloc[0,1], line.iloc[0,2].replace('bl', 'tl'), line.iloc[0,2].replace('bl', 'tr'), line.iloc[0,2].replace('bl', 'bl'), line.iloc[0,2].replace('bl', 'br'), line.iloc[0,3].replace('bl', 'tl'), line.iloc[0,3].replace('bl', 'tr'), line.iloc[0,3].replace('bl', 'bl'), line.iloc[0,3].replace('bl', 'br'), line.iloc[0,4]], index=df_columns)
+        data_frame = data_frame.append(series, ignore_index=True)
+        print(i, end='\r')
+
+    # Create CSV
+    data_frame.to_csv(f'./../dataset_inpainting.csv', index=False, encoding='utf-8')
+
 if __name__ == "__main__":
     dataset_dir_name = '3d-ken-burns-dataset'
     dataset_path = './'
@@ -195,3 +207,4 @@ if __name__ == "__main__":
 
     if csv:
         create_csv(dataset_path)
+        create_csv_inpainting('./../dataset.csv')
