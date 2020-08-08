@@ -52,7 +52,7 @@ def train(args, refinementModel, data_loader, optimizer, scheduler, epoch, iter_
             # save output and input of model as JPEG
             file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}'
             logs_path = os.path.join(args.logs_path, file_name)
-            save_log(refined_disparity, file_name=f'{logs_path}-disparity.jpg')
+            save_log(disparity_refined, file_name=f'{logs_path}-disparity.jpg')
             save_log(depth, file_name=f'{logs_path}-depth.jpg')
 
             # compute estimated time of arrival
