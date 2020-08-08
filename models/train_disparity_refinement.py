@@ -1,6 +1,6 @@
 from disparity_refinement import Refine
 from disparity_estimation import Disparity, Semantics
-from transforms import ToTensor
+from transforms import ToTensor, DownscaleDepth
 from dataset import ImageDepthDataset
 from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad
 from utils import load_model, save_model, get_eta_string, save_log, pad_number
@@ -18,30 +18,24 @@ import time
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
 # TODO: collect metrics for plots
-def train(args, refinementModel, disparityModel, semanticsModel, data_loader, optimizer, scheduler, epoch, iter_nb):
+def train(args, refinementModel, data_loader, optimizer, scheduler, epoch, iter_nb):
 
     for batch_idx, sample_batched in enumerate(data_loader):
         if batch_idx % args.log_interval == 0:
             t1 = time.time()
 
-        image, depth, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['fltFov']
-        #print(batch_idx, image.shape, depth.shape, fltFov.shape)
+        image, depth, depth_adjusted, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['depth_adjusted'], sample_batched['fltFov']
+        #print(batch_idx, image.shape, depth.shape, depth_adjusted.shape, fltFov.shape)
 
         # reset previously calculated gradients (deallocate memory)
         optimizer.zero_grad()
-
-        # forward pass through Semantics() network
-        with torch.no_grad(): # disable calculation of gradients
-            semanticsOutput = semanticsModel(image)
-            estimated_disparity = disparityModel(image, semanticsOutput)
         
-        refined_disparity = refinementModel(image, estimated_disparity)
-        refined_disparity = torch.nn.functional.threshold(refined_disparity, threshold=0.0, value=0.0)
+        disparity_refined = refinementModel(image, depth_adjusted)
 
         # reconstruction loss computation
         mask = torch.ones(depth.shape).to(device)
-        loss_ord = compute_loss_ord(refined_disparity, depth, mask)
-        loss_grad = compute_loss_grad(refined_disparity, depth, mask, device)
+        loss_ord = compute_loss_ord(disparity_refined, depth, mask)
+        loss_grad = compute_loss_grad(disparity_refined, depth, mask, device)
 
         loss_depth = 0.0001 * loss_ord + loss_grad
         loss_depth.backward()
@@ -56,7 +50,7 @@ def train(args, refinementModel, disparityModel, semanticsModel, data_loader, op
             progress = 100. * current_step / total_steps
 
             # save output and input of model as JPEG
-            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}'
+            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}'
             logs_path = os.path.join(args.logs_path, file_name)
             save_log(refined_disparity, file_name=f'{logs_path}-disparity.jpg')
             save_log(depth, file_name=f'{logs_path}-depth.jpg')
@@ -64,7 +58,7 @@ def train(args, refinementModel, disparityModel, semanticsModel, data_loader, op
             # compute estimated time of arrival
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.2f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.8f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
@@ -75,7 +69,7 @@ def train(args, refinementModel, disparityModel, semanticsModel, data_loader, op
                     'model':refinementModel,
                     'opt':optimizer,
                     'schedule': scheduler,
-                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}.pt'
+                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}.pt'
                 }
             }
             save_model(model, iter_nb, args.models_path)
@@ -144,8 +138,8 @@ def main():
     torch.manual_seed(args.seed)
 
     # get train and valid dataset
-    transform = transforms.Compose([ToTensor()])
-    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
+    transform = transforms.Compose([DownscaleDepth(), ToTensor(device)])
+    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, train_mode='refinement', transform=transform)
 
     train_loader, valid_loader = dataset.get_train_valid_loader(
         args.batch_size,
@@ -158,8 +152,6 @@ def main():
 
     iter_nb = 0
 
-    disparityModel = Disparity().to(device).eval(); disparityModel.load_state_dict(torch.load(args.disparity_path))
-    semanticsModel = Semantics().to(device).eval()
     refinementModel = Refine().to(device).eval()
 
     optimizer = torch.optim.Adam(refinementModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
@@ -175,7 +167,7 @@ def main():
     refinementModel.train()
 
     for epoch in range(1, args.epochs + 1):
-        iter_nb += train(args, refinementModel, disparityModel, semanticsModel, train_loader, optimizer, scheduler, epoch, iter_nb)
+        iter_nb += train(args, refinementModel, train_loader, optimizer, scheduler, epoch, iter_nb)
         valid(refinementModel, valid_loader)
 
 

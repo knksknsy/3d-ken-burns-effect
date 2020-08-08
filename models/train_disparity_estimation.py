@@ -34,7 +34,6 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
             semanticsOutput = semanticsModel(image)
         
         disparity = disparityModel(image, semanticsOutput)
-        disparity = torch.nn.functional.threshold(disparity, threshold=0.0, value=0.0)
 
         # reconstruction loss computation
         mask = torch.ones(depth.shape).to(device)
@@ -61,7 +60,7 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
             progress = 100. * current_step / total_steps
 
             # save output and input of model as JPEG
-            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}'
+            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}'
             logs_path = os.path.join(args.logs_path, file_name)
             save_log(disparity, file_name=f'{logs_path}-disparity.jpg')
             save_log(depth, file_name=f'{logs_path}-depth.jpg')
@@ -69,7 +68,7 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
             # compute estimated time of arrival
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.2f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.8f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
@@ -80,7 +79,7 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
                     'model':disparityModel,
                     'opt':optimizer,
                     'schedule': scheduler,
-                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.2f}.pt'
+                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}.pt'
                 }
             }
             save_model(model, iter_nb, args.models_path)
@@ -147,8 +146,8 @@ def main():
     torch.manual_seed(args.seed)
 
     # get train and valid dataset
-    transform = transforms.Compose([DownscaleDepth(), RandomRescaleCrop(args.batch_size), ToTensor()])
-    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, transform=transform)
+    transform = transforms.Compose([DownscaleDepth(), RandomRescaleCrop(args.batch_size), ToTensor(device)])
+    dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, train_mode='estimation', transform=transform)
 
     train_loader, valid_loader = dataset.get_train_valid_loader(
         args.batch_size,

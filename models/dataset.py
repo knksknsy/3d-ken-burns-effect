@@ -12,7 +12,7 @@ from cv2 import cv2
 class ImageDepthDataset(Dataset):
     """Image Depth dataset."""
 
-    def __init__(self, csv_file, dataset_path, transform=None):
+    def __init__(self, csv_file, dataset_path, train_mode='estimation', transform=None):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -22,6 +22,7 @@ class ImageDepthDataset(Dataset):
         self.dataset_frame = pd.read_csv(csv_file)
         self.dataset_path = dataset_path
         self.transform = transform
+        self.train_mode = train_mode
 
     def get_train_valid_loader(self, batch_size, valid_batch_size, valid_size, seed, num_workers, pin_memory):
         """
@@ -83,7 +84,7 @@ class ImageDepthDataset(Dataset):
         focal = max_dim / np.tan(np.deg2rad(fltFov_))
         depth = (focal * baseline) / (depth + 0.0000001)
 
-        sample = {'image': image, 'depth': depth, 'fltFov': fltFov}
+        sample = {'image': image, 'depth': depth, 'fltFov': fltFov, 'train_mode': self.train_mode}
 
         if self.transform:
             sample = self.transform(sample)
