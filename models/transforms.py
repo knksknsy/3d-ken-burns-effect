@@ -22,9 +22,9 @@ class ToTensor(object):
         depth = torch.FloatTensor(np.ascontiguousarray(depth[None, :, :].astype(np.float32))).to(self.device)
 
         if train_mode == 'refinement':
-            adjusted = sample['depth_adjusted']
-            adjusted = torch.FloatTensor(np.ascontiguousarray(depth[None, :, :].astype(np.float32))).to(self.device)
-            return {'image': image, 'depth': depth, 'depth_adjusted': adjusted, 'fltFov': fltFov}
+            depth_adjusted = sample['depth_adjusted']
+            depth_adjusted = torch.FloatTensor(np.ascontiguousarray(depth_adjusted[None, :, :].astype(np.float32))).to(self.device)
+            return {'image': image, 'depth': depth, 'depth_adjusted': depth_adjusted, 'fltFov': fltFov}
 
         return {'image': image, 'depth': depth, 'fltFov': fltFov}
 
