@@ -49,7 +49,7 @@ class DownscaleDepth(object):
             #image = cv2.resize(image, (intWidth, intHeight), interpolation=cv2.INTER_LINEAR)
             return {'image': image, 'depth': depth, 'fltFov': fltFov, 'train_mode': train_mode}
 
-        else if train_mode == 'refinement':
+        elif train_mode == 'refinement':
             depth_adjusted = cv2.resize(depth, (intWidth, intHeight), interpolation=cv2.INTER_LINEAR)
             return {'image': image, 'depth': depth, 'depth_adjusted': depth_adjusted, 'fltFov': fltFov, 'train_mode': train_mode}
 

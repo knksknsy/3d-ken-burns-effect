@@ -108,8 +108,6 @@ def parse_args():
                         type=str, help='Path to dataset')
     parser.add_argument('--models-path', action='store',
                         type=str, default='../model_checkpoints', help='Path to save model checkpoints')                
-    parser.add_argument('--disparity-path', action='store',
-                        type=str, help='Path to trained disparity model')
     parser.add_argument('--logs-path', action='store',
                         type=str, default='../logs', help='Path to save logs')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
