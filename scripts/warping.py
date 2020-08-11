@@ -41,7 +41,7 @@ tenDisp = (image.shape[1] * baseline) / tenDepth
 # 1,0	=> left to right: input order: (br, bl) or (tr, tl)
 # 0,1	=> top to bottom: input order: (bl, tl) or (br, tr)
 # 0,-1	=> bottom to top: input order: (tl, bl) or (tr, br)
-tenFlow = torch.cat([-1.0 * tenDisp, 0.0 * tenDisp], 1) 
+tenFlow = torch.cat([-1.0 * tenDisp, 0.0 * tenDisp], 1)
 
 npyWarped = []
 for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):

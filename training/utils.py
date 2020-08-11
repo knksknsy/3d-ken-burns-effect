@@ -1,4 +1,3 @@
-import cupy
 import torch
 import torchvision
 from cv2 import cv2

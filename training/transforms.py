@@ -1,8 +1,10 @@
 import torch
 import torchvision
-import cupy
 import numpy as np
 from cv2 import cv2
+
+if torch.cuda.is_available():
+    import softsplat
 
 
 class ToTensor(object):
@@ -12,21 +14,34 @@ class ToTensor(object):
         self.device = device
 
     def __call__(self, sample):
-        image, depth, fltFov, train_mode = sample['image'], sample['depth'], sample['fltFov'], sample['train_mode']
+        train_mode, fltFov = sample['train_mode'], sample['fltFov']
 
-        # swap color axis because
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        # normalize image
-        image = torch.FloatTensor(np.ascontiguousarray(image.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).to(self.device)
-        depth = torch.FloatTensor(np.ascontiguousarray(depth[None, :, :].astype(np.float32))).to(self.device)
+        if train_mode == 'inpainting':
+            image_from, image_to = sample['image_from'], sample['image_to']
+            depth_from, depth_to = sample['depth_from'], sample['depth_to']
+            flow = sample['flow']
 
-        if train_mode == 'refinement':
-            depth_adjusted = sample['depth_adjusted']
-            depth_adjusted = torch.FloatTensor(np.ascontiguousarray(depth_adjusted[None, :, :].astype(np.float32))).to(self.device)
-            return {'image': image, 'depth': depth, 'depth_adjusted': depth_adjusted, 'fltFov': fltFov}
+            image_from = torch.FloatTensor(np.ascontiguousarray(image_from.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).to(self.device)
+            image_to = torch.FloatTensor(np.ascontiguousarray(image_to.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).to(self.device)
+            depth_from = torch.FloatTensor(np.ascontiguousarray(depth_from[None, :, :].astype(np.float32))).to(self.device)
+            depth_to = torch.FloatTensor(np.ascontiguousarray(depth_to[None, :, :].astype(np.float32))).to(self.device)
 
-        return {'image': image, 'depth': depth, 'fltFov': fltFov}
+            return {'image_from': image_from, 'image_to': image_to, 'depth_from': depth_from, 'depth_to': depth_to, 'flow': flow, 'fltFov': fltFov, 'train_mode': train_mode}
+
+        else:
+            image, depth  = sample['image'], sample['depth']
+            # swap color axis because
+            # numpy image: H x W x C ; torch image: C X H X W
+            image = torch.FloatTensor(np.ascontiguousarray(image.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0)).to(self.device)
+            depth = torch.FloatTensor(np.ascontiguousarray(depth[None, :, :].astype(np.float32))).to(self.device)
+
+            if train_mode == 'estimation':
+                return {'image': image, 'depth': depth, 'fltFov': fltFov}
+
+            elif train_mode == 'refinement':
+                depth_adjusted = sample['depth_adjusted']
+                depth_adjusted = torch.FloatTensor(np.ascontiguousarray(depth_adjusted[None, :, :].astype(np.float32))).to(self.device)
+                return {'image': image, 'depth': depth, 'depth_adjusted': depth_adjusted, 'fltFov': fltFov}
 
 
 class DownscaleDepth(object):
@@ -104,3 +119,27 @@ class RandomRescaleCrop(object):
             RandomRescaleCrop.batch_process_count += 1
         
         return {'image': image, 'depth': depth, 'fltFov': fltFov, 'train_mode': train_mode}
+
+class RandomWarp(object):
+    """Randomly warp image pairs. Creates masked image and depth for inpaining training."""
+
+    def __call__(self, sample):
+        image_from, image_to = sample['image_from'], sample['image_to']
+        depth_from, depth_to = sample['depth_from'], sample['depth_to']
+        flow, fltFov = sample['flow'], sample['fltFov']
+
+        flow = torch.cat([flow[0] * depth_from, flow[1] * depth_from], 1)
+
+        # create masked images for color inpainting
+        images_warped = []
+        for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):
+            images_warped.append((softsplat.FunctionSoftsplat(tenInput=image_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax')))
+        image_masked = images_warped[-1] # GT = image_to
+
+        # create masked depths for depth inpainting
+        depths_warped = []
+        for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):
+            depths_warped.append((softsplat.FunctionSoftsplat(tenInput=depth_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax')))
+        depth_masked = depths_warped[-1] # GT = depth_to
+
+        return {'image_masked': image_masked, 'image': image_to, 'depth_masked': depth_masked, 'depth': depth_to, 'fltFov': fltFov, 'train_mode': train_mode}

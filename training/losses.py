@@ -1,4 +1,3 @@
-import cupy
 import torch
 import torchvision
 
