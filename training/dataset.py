@@ -12,6 +12,8 @@ from cv2 import cv2
 class ImageDepthDataset(Dataset):
     """Image Depth dataset."""
 
+    batch_process_count = 0
+
     def __init__(self, csv_file, dataset_path, train_mode='estimation', transform=None):
         """
         Args:
@@ -34,6 +36,7 @@ class ImageDepthDataset(Dataset):
             num_workers (int): Number of workers for multiprocessing. Disabled on Windows => num_workers=0
             pin_memory (bool): Speeds-up the transfer of dataset between CPU and GPU
         """
+        self.batch_size = batch_size
         train_dataset = self
         valid_dataset = copy.deepcopy(train_dataset)
         num_train = len(train_dataset)
@@ -102,9 +105,12 @@ class ImageDepthDataset(Dataset):
                 {'from': tl_idx, 'to': bl_idx, 'flow': [0.0, -1.0]},
                 {'from': tr_idx, 'to': br_idx, 'flow': [0.0, -1.0]}
             ]
+
             # randomly choose one warping direction
-            warping_direction_idx = np.random.randint(0, len(warpings))
-            warping_direction = warpings[warping_direction_idx]
+            if (self.batch_process_count == 0):
+                self.warping_direction_idx = np.random.randint(0, len(warpings))
+
+            warping_direction = warpings[self.warping_direction_idx]
 
             # read imageFrom and imageTo
             archive_image = ZipFile(zip_image_path, 'r')
@@ -127,6 +133,11 @@ class ImageDepthDataset(Dataset):
             # Convert 32bit depth values to float values
             depth_from = (depth_from.shape[1] * baseline) / (depth_from)
             depth_to = (depth_to.shape[1] * baseline) / (depth_to)
+
+            if self.batch_process_count >= self.batch_size -1:
+                self.batch_process_count = 0
+            else:
+                self.batch_process_count += 1
 
             sample = {'image_from': image_from, 'image_to': image_to, 'depth_from': depth_from, 'depth_to': depth_to, 'flow': warping_direction['flow'], 'fltFov': fltFov, 'train_mode': self.train_mode}
 
