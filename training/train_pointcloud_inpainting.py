@@ -46,6 +46,11 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
 
         # combined loss computation
         loss_inpaint = loss_color + loss_perception + loss_depth
+
+        if np.isnan(loss_inpaint.item()):
+            current_step = (batch_idx * len(image_gt)) + (args.batch_size * args.log_interval)
+            print(f'iteration: {current_step}\nloss_color: {loss_color.item()}\nloss_perception: {loss_perception.item()}\nloss_ord: {loss_ord.item()}\nloss_grad: {loss_grad.item()}')
+
         loss_inpaint.backward()
         torch.nn.utils.clip_grad_norm_(inpaintModel.parameters(), 1)
         optimizer.step()
