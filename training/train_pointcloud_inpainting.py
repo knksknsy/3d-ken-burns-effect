@@ -63,8 +63,8 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
             logs_path = os.path.join(args.logs_path, file_name)
             save_log(inpaint_color, file_name=f'{logs_path}-color.jpg')
             save_log(inpaint_depth, file_name=f'{logs_path}-depth.jpg')
-            save_log(image_gt, file_name=f'{logs_path}-color-gt.jpg')
-            save_log(depth_gt, file_name=f'{logs_path}-depth-gt.jpg')
+            #save_log(image_gt, file_name=f'{logs_path}-color-gt.jpg')
+            #save_log(depth_gt, file_name=f'{logs_path}-depth-gt.jpg')
 
             # compute estimated time of arrival
             t2 = time.time()
