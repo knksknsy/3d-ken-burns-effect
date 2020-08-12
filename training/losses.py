@@ -29,18 +29,24 @@ def derivative_scale(tensor, h, device, norm=True):
     return torch.nn.functional.pad(diff_x, (0, 0, h, 0)), torch.nn.functional.pad(diff_y, (h, 0, 0, 0))
 
 
-def compute_l1_loss(disparity, target):
+def compute_l1_loss(output, target):
     L1Loss = torch.nn.L1Loss(reduction='mean')
-    return L1Loss(disparity, target)
+    loss = L1Loss(output, target)
+
+    if torch.isnan(loss) or torch.isinf(loss):
+        loss = 0
+        print(iteration)
+
+    return loss
 
 
-def compute_loss_grad(disparity, target, device):        
+def compute_loss_grad(output, target, device):        
     scales = [2**i for i in range(4)]
     MSELoss = torch.nn.MSELoss(reduction='mean')
 
     loss = 0
     for h in scales:
-        g_h_disparity_x, g_h_disparity_y = derivative_scale(disparity, h, device, norm=True)
+        g_h_disparity_x, g_h_disparity_y = derivative_scale(output, h, device, norm=True)
         g_h_target_x, g_h_target_y = derivative_scale(target, h, device, norm=True)
 
         loss += MSELoss(g_h_disparity_x, g_h_target_x)
@@ -51,4 +57,9 @@ def compute_loss_grad(disparity, target, device):
 
 def compute_loss_perception(output, target):
     MSELoss = torch.nn.MSELoss(reduction='mean')
-    return MSELoss(output, target)
+    loss = MSELoss(output, target)
+
+    if torch.isnan(loss) or torch.isinf(loss):
+        loss = 0
+
+    return loss
