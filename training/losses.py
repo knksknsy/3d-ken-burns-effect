@@ -35,7 +35,6 @@ def compute_l1_loss(output, target):
 
     if torch.isnan(loss) or torch.isinf(loss):
         loss = 0
-        print(iteration)
 
     return loss
 
