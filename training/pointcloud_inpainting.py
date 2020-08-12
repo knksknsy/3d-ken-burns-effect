@@ -116,10 +116,7 @@ class Inpaint(torch.nn.Module):
 		self.moduleDisparity = Basic('conv-relu-conv', [ 32, 32, 1 ])
 	# end
 
-	def forward(self, iteration, tenImageMasked, tenImage, tenDisparityMasked, tenDisparity):
-		# if iteration == 260:
-		# 	print(260)
-
+	def forward(self, tenImageMasked, tenImage, tenDisparityMasked, tenDisparity):
 		tenMean = [ tenImage.view(tenImage.shape[0], -1).mean(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).mean(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
 		tenStd = [ tenImage.view(tenImage.shape[0], -1).std(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).std(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
 

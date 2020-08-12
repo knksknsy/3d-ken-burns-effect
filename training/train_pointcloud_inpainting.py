@@ -18,8 +18,6 @@ if torch.cuda.is_available():
     import cupy
     device = torch.device('cuda')
 
-itr_error = -1
-
 def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, epoch, iter_nb):
 
     for batch_idx, sample_batched in enumerate(data_loader):
@@ -31,7 +29,7 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
         # reset previously calculated gradients (deallocate memory)
         optimizer.zero_grad()
         
-        inpaint_color, inpaint_depth = inpaintModel((batch_idx * len(image_gt)) + (args.batch_size * args.log_interval), image_masked, image_gt, depth_masked, depth_gt)
+        inpaint_color, inpaint_depth = inpaintModel(image_masked, image_gt, depth_masked, depth_gt)
 
         # color inpainting loss cumputation
         loss_color = compute_l1_loss(inpaint_color, image_gt)
@@ -48,10 +46,6 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
 
         # combined loss computation
         loss_inpaint = loss_color + loss_perception + loss_depth
-
-        if torch.isnan(loss_inpaint) or torch.isinf(loss_inpaint):
-            if itr_error == -1:
-                itr_error = (batch_idx * len(image_gt)) + (args.batch_size * args.log_interval)
 
         loss_inpaint.backward()
         torch.nn.utils.clip_grad_norm_(inpaintModel.parameters(), 1)
@@ -75,7 +69,7 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
             # compute estimated time of arrival
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'itr_error: {itr_error}\tTrain Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_inpaint:.8f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_inpaint:.8f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
