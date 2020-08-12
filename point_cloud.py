@@ -52,6 +52,10 @@ exec(open('models/pointcloud_inpainting.py', 'r').read())
 
 ##########################################################
 
+arguments_image = ""
+arguments_depth = ""
+arguments_meta = ""
+
 for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
     if strOption == '--image' and strArgument != '': arguments_image = strArgument # path to the input image
     if strOption == '--depth' and strArgument != '': arguments_depth = strArgument # path to where the output should be stored

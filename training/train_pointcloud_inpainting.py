@@ -1,7 +1,7 @@
 from pointcloud_inpainting import Inpaint
 from transforms import ToTensor, RandomWarp
 from dataset import ImageDepthDataset
-from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad
+from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad, compute_loss_perception
 from utils import load_model, save_model, get_eta_string, save_log, pad_number
 
 import torch
@@ -18,58 +18,67 @@ if torch.cuda.is_available():
     import cupy
     device = torch.device('cuda')
 
-def train(args, inpaintModel, data_loader, optimizer, scheduler, epoch, iter_nb):
+def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, epoch, iter_nb):
 
     for batch_idx, sample_batched in enumerate(data_loader):
         if batch_idx % args.log_interval == 0:
             t1 = time.time()
 
-        image, depth, depth_adjusted, fltFov = sample_batched['image'], sample_batched['depth'], sample_batched['depth_adjusted'], sample_batched['fltFov']
-        #print(batch_idx, image.shape, depth.shape, depth_adjusted.shape, fltFov.shape)
+        image_masked, image_gt, depth_masked, depth_gt, fltFov = sample_batched['image_masked'], sample_batched['image_gt'], sample_batched['depth_masked'], sample_batched['depth_gt'], sample_batched['fltFov']
 
         # reset previously calculated gradients (deallocate memory)
         optimizer.zero_grad()
         
-        disparity_refined = inpaintModel(image, depth_adjusted)
+        inpaint_color, inpaint_depth = inpaintModel(image_masked, image_gt, depth_masked, depth_gt)
+        mask = torch.ones(depth_gt.shape).to(device)
 
-        # reconstruction loss computation
-        mask = torch.ones(depth.shape).to(device)
-        loss_ord = compute_loss_ord(disparity_refined, depth, mask)
-        loss_grad = compute_loss_grad(disparity_refined, depth, mask, device)
+        # color inpainting loss cumputation
+        loss_color = compute_loss_ord(inpaint_color, image_gt, mask)
 
+        with torch.no_grad(): # disable calculation of gradients
+            loss_perception = compute_loss_perception(vggModelRelu4(inpaint_color), vggModelRelu4(image_gt), device)
+        
+        # depth inpainting loss computation
+        loss_ord = compute_loss_ord(inpaint_depth, depth_gt, mask)
+        loss_grad = compute_loss_grad(inpaint_depth, depth_gt, mask, device)
         loss_depth = 0.0001 * loss_ord + loss_grad
-        loss_depth.backward()
+
+        # combined loss computation
+        loss_inpaint = loss_color + loss_perception + loss_depth
+        loss_inpaint.backward()
         torch.nn.utils.clip_grad_norm_(inpaintModel.parameters(), 1)
         optimizer.step()
         scheduler.step()
 
         # print loss and progress
         if batch_idx % args.log_interval == 0:
-            current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
+            current_step = (batch_idx * len(image_gt)) + (args.batch_size * args.log_interval)
             total_steps = len(data_loader) * args.batch_size
             progress = 100. * current_step / total_steps
 
             # save output and input of model as JPEG
-            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}'
+            file_name = f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_inpaint:.8f}'
             logs_path = os.path.join(args.logs_path, file_name)
-            save_log(disparity_refined, file_name=f'{logs_path}-disparity.jpg')
-            save_log(depth, file_name=f'{logs_path}-depth.jpg')
+            save_log(inpaint_color, file_name=f'{logs_path}-color.jpg')
+            save_log(inpaint_depth, file_name=f'{logs_path}-depth.jpg')
+            save_log(image_gt, file_name=f'{logs_path}-color-gt.jpg')
+            save_log(depth_gt, file_name=f'{logs_path}-depth-gt.jpg')
 
             # compute estimated time of arrival
             t2 = time.time()
             eta = get_eta_string(t1, t2, current_step, total_steps, epoch, args)
-            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_depth:.8f}\t{eta}', end='\r')
+            print(f'Train Epoch: {epoch} [{current_step}/{total_steps} ({progress:.0f} %)]\tLoss: {loss_inpaint:.8f}\t{eta}', end='\r')
         
         # save model checkpoint every 5 % iterations
         if batch_idx % int((len(data_loader) * 0.05)) == 0:
-            current_step = (batch_idx * len(image)) + (args.batch_size * args.log_interval)
+            current_step = (batch_idx * len(image_gt)) + (args.batch_size * args.log_interval)
             total_steps = len(data_loader) * args.batch_size
             model = {
                 'inpainting': {
-                    'model':inpaintModel,
-                    'opt':optimizer,
+                    'model': inpaintModel,
+                    'opt': optimizer,
                     'schedule': scheduler,
-                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_depth:.8f}.pt'
+                    'file_name': f'e-{pad_number(args.epochs, epoch)}-it-{pad_number(total_steps, current_step)}-b-{args.batch_size}-l-{loss_inpaint:.8f}.pt'
                 }
             }
             save_model(model, iter_nb, args.models_path)
@@ -89,7 +98,7 @@ def parse_args():
                         help='input batch size for training (default: 1)')
     parser.add_argument('--valid-batch-size', type=int, default=1,
                         metavar='N', help='input batch size for testing (default: 1)')
-    parser.add_argument('--epochs', type=int, default=3, metavar='N',
+    parser.add_argument('--epochs', type=int, default=26, metavar='N',
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.0001,
                         metavar='LR', help='learning rate (default: 0.0001)')
@@ -149,6 +158,24 @@ def main():
 
     iter_nb = 0
 
+    vggModelRelu4 = torchvision.models.vgg19_bn(pretrained=True).features.to(device).eval()
+    vggModelRelu4 = torch.nn.Sequential(
+        vggModelRelu4[0:3],
+        vggModelRelu4[3:6],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModelRelu4[7:10],
+        vggModelRelu4[10:13],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModelRelu4[14:17],
+        vggModelRelu4[17:20],
+        vggModelRelu4[20:23],
+        vggModelRelu4[23:26],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModelRelu4[27:30],
+        vggModelRelu4[30:33],
+        vggModelRelu4[33:36],
+        vggModelRelu4[36:39])
+
     inpaintModel = Inpaint().to(device).eval()
 
     optimizer = torch.optim.Adam(inpaintModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
@@ -164,7 +191,7 @@ def main():
     inpaintModel.train()
 
     for epoch in range(1, args.epochs + 1):
-        iter_nb += train(args, inpaintModel, train_loader, optimizer, scheduler, epoch, iter_nb)
+        iter_nb += train(args, inpaintModel, vggModelRelu4, train_loader, optimizer, scheduler, epoch, iter_nb)
         valid(inpaintModel, valid_loader)
 
 

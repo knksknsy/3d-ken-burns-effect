@@ -103,7 +103,8 @@ class ImageDepthDataset(Dataset):
                 {'from': tr_idx, 'to': br_idx, 'flow': [0.0, -1.0]}
             ]
             # randomly choose one warping direction
-            warping_direction = np.random.randint(0, len(warpings))
+            warping_direction_idx = np.random.randint(0, len(warpings))
+            warping_direction = warpings[warping_direction_idx]
 
             # read imageFrom and imageTo
             archive_image = ZipFile(zip_image_path, 'r')

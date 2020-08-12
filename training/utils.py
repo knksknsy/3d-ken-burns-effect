@@ -43,10 +43,15 @@ def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
     return f'{tps}\tETA ({left_epochs} Epochs): {eta_d:.0f}d {eta_hms}'
 
 
-def save_log(disparity, file_name):
-    disparity_out = (disparity[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
-    disparity_out = disparity_out.detach().cpu().numpy()
-    cv2.imwrite(file_name, disparity_out)
+def save_log(tensor, file_name):
+    if tensor.shape[1] == 1: # log disparity image
+        tensor_out = (tensor[0,0,:,:] / 20 * 255.0).clamp(0.0, 255.0).type(torch.uint8)
+        tensor_out = tensor_out.detach().cpu().numpy()
+        cv2.imwrite(file_name, tensor_out)
+    elif tensor.shape[1] == 3: # log color image
+        tensor_out = (tensor[0,:,:,:] * 255.0).permute(1,2,0).clamp(0.0, 255.0).type(torch.uint8)
+        tensor_out = tensor_out.detach().cpu().numpy()
+        cv2.imwrite(file_name, tensor_out)
 
 
 def pad_number(max_number, current_number):

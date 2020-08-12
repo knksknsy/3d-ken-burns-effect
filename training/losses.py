@@ -55,3 +55,16 @@ def compute_loss_grad(disparity, target, mask, device):
             loss += MSELoss(g_h_disparity_y * mask, g_h_target_y * mask) / N
 
     return loss
+
+
+def compute_loss_perception(output, target, device):
+    mask = torch.ones(output.shape).to(device)
+    MSELoss = torch.nn.MSELoss(reduction='sum')
+
+    loss = 0
+    N = torch.sum(mask)
+
+    if N != 0:
+        loss += (MSELoss(output * mask, target * mask) / N).pow(2)
+
+    return loss

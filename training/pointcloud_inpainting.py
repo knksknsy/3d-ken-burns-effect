@@ -116,12 +116,7 @@ class Inpaint(torch.nn.Module):
 		self.moduleDisparity = Basic('conv-relu-conv', [ 32, 32, 1 ])
 	# end
 
-	def forward(self, tenImage, tenDisparity, tenShift):
-		tenDepth = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (tenDisparity + 0.0000001)
-		tenValid = (spatial_filter(tenDisparity / tenDisparity.max(), 'laplacian').abs() < 0.03).float()
-		tenPoints = depth_to_points(tenDepth * tenValid, objCommon['fltFocal'])
-		tenPoints = tenPoints.view(1, 3, -1)
-
+	def forward(self, tenImageMasked, tenImage, tenDisparityMasked, tenDisparity):
 		tenMean = [ tenImage.view(tenImage.shape[0], -1).mean(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).mean(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
 		tenStd = [ tenImage.view(tenImage.shape[0], -1).std(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).std(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
 
@@ -134,26 +129,15 @@ class Inpaint(torch.nn.Module):
 		tenDisparity /= tenStd[1] + 0.0000001
 
 		tenContext = self.moduleContext(torch.cat([ tenImage, tenDisparity ], 1))
+		tenRender = torch.cat([tenImageMasked, tenDisparityMasked, tenContext], 1)
 
-		# TODO
-		tenContextOut = (tenContext[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
-		tenContextOut = cv2.resize(src=tenContextOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
-		cv2.imwrite(f'./images/autozoom/kbe/no_inpainting/context-{tenShift[0][1].item():.2f}.png', tenContextOut)
-
-		tenRender, tenExisting = render_pointcloud(tenPoints + tenShift, torch.cat([ tenImage, tenDisparity, tenContext ], 1).view(1, 68, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
-
-		# TODO
-		tenRenderOut = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
-		tenRenderOut = cv2.resize(src=tenRenderOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
-		cv2.imwrite(f'./images/autozoom/kbe/no_inpainting/extreme-view-{tenShift[0][1].item():.2f}.png', tenRenderOut)
-
-		tenExisting = (tenExisting > 0.0).float()
-		tenExisting = tenExisting * spatial_filter(tenExisting, 'median-5')
-		tenRender = tenRender * tenExisting.clone().detach()
+		tenMask = tenDisparityMasked.clone()
+		tenMask[tenMask > 0] = 1
+		
 
 		tenColumn = [ None, None, None, None ]
 
-		tenColumn[0] = self.moduleInput(torch.cat([ tenRender, tenExisting ], 1))
+		tenColumn[0] = self.moduleInput(torch.cat([tenRender, tenMask], 1))
 		tenColumn[1] = self._modules['0x0 - 1x0'](tenColumn[0])
 		tenColumn[2] = self._modules['1x0 - 2x0'](tenColumn[1])
 		tenColumn[3] = self._modules['2x0 - 3x0'](tenColumn[2])
@@ -200,11 +184,7 @@ class Inpaint(torch.nn.Module):
 		tenDisparity *= tenStd[1] + 0.0000001
 		tenDisparity += tenMean[1]
 
-		return {
-			'tenExisting': tenExisting,
-			'tenImage': tenImage.clamp(0.0, 1.0) if self.training == False else tenImage,
-			'tenDisparity': torch.nn.functional.threshold(input=tenDisparity, threshold=0.0, value=0.0)
-		}
+		return tenImage, torch.nn.functional.threshold(input=tenDisparity, threshold=0.0, value=0.0)
 	# end
 # end
 

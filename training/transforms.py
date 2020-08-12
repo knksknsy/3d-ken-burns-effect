@@ -126,20 +126,22 @@ class RandomWarp(object):
     def __call__(self, sample):
         image_from, image_to = sample['image_from'], sample['image_to']
         depth_from, depth_to = sample['depth_from'], sample['depth_to']
-        flow, fltFov = sample['flow'], sample['fltFov']
+        flow, fltFov, train_mode = sample['flow'], sample['fltFov'], sample['train_mode']
+
+        image_from, depth_from = image_from[None,:,:,:], depth_from[None,:,:,:]
 
         flow = torch.cat([flow[0] * depth_from, flow[1] * depth_from], 1)
 
-        # create masked images for color inpainting
-        images_warped = []
+        color_warped = []
         for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):
-            images_warped.append((softsplat.FunctionSoftsplat(tenInput=image_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax')))
-        image_masked = images_warped[-1] # GT = image_to
+            color_warped.append(softsplat.FunctionSoftsplat(tenInput=image_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax'))
+        image_masked = color_warped[-1]
+        image_gt = image_to
 
-        # create masked depths for depth inpainting
-        depths_warped = []
+        depth_warped = []
         for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):
-            depths_warped.append((softsplat.FunctionSoftsplat(tenInput=depth_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax')))
-        depth_masked = depths_warped[-1] # GT = depth_to
+	        depth_warped.append(softsplat.FunctionSoftsplat(tenInput=depth_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax'))
+        depth_masked = depth_warped[-1]
+        depth_gt = depth_to
 
-        return {'image_masked': image_masked, 'image': image_to, 'depth_masked': depth_masked, 'depth': depth_to, 'fltFov': fltFov, 'train_mode': train_mode}
+        return {'image_masked': image_masked[0,:,:,:], 'image_gt': image_gt, 'depth_masked': depth_masked[0,:,:,:], 'depth_gt': depth_gt, 'fltFov': fltFov}
