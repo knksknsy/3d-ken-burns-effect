@@ -1,7 +1,7 @@
 from pointcloud_inpainting import Inpaint
 from transforms import ToTensor, RandomWarp
 from dataset import ImageDepthDataset
-from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad, compute_loss_perception
+from losses import get_kernels, derivative_scale, compute_l1_loss, compute_loss_grad, compute_loss_perception
 from utils import load_model, save_model, get_eta_string, save_log, pad_number
 
 import torch
@@ -30,19 +30,18 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
         optimizer.zero_grad()
         
         inpaint_color, inpaint_depth = inpaintModel(image_masked, image_gt, depth_masked, depth_gt)
-        mask = torch.ones(depth_gt.shape).to(device)
 
         # color inpainting loss cumputation
-        loss_color = compute_loss_ord(inpaint_color, image_gt, mask)
+        loss_color = compute_l1_loss(inpaint_color, image_gt)
 
         with torch.no_grad(): # disable calculation of gradients
             vgg_inpaint_color, vgg_image_gt = vggModelRelu4(inpaint_color), vggModelRelu4(image_gt)
 
-        loss_perception = compute_loss_perception(vgg_inpaint_color, vgg_image_gt, device)
+        loss_perception = compute_loss_perception(vgg_inpaint_color, vgg_image_gt)
         
         # depth inpainting loss computation
-        loss_ord = compute_loss_ord(inpaint_depth, depth_gt, mask)
-        loss_grad = compute_loss_grad(inpaint_depth, depth_gt, mask, device)
+        loss_ord = compute_l1_loss(inpaint_depth, depth_gt)
+        loss_grad = compute_loss_grad(inpaint_depth, depth_gt, device)
         loss_depth = 0.0001 * loss_ord + loss_grad
 
         # combined loss computation

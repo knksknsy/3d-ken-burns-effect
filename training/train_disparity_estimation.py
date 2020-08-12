@@ -1,7 +1,7 @@
 from disparity_estimation import Disparity, Semantics
 from transforms import ToTensor, DownscaleDepth, RandomRescaleCrop
 from dataset import ImageDepthDataset
-from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad
+from losses import get_kernels, derivative_scale, compute_l1_loss, compute_loss_grad
 from utils import load_model, save_model, get_eta_string, save_log, pad_number
 
 import torch
@@ -37,9 +37,8 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
         disparity = disparityModel(image, semanticsOutput)
 
         # reconstruction loss computation
-        mask = torch.ones(depth.shape).to(device)
-        loss_ord = compute_loss_ord(disparity, depth, mask)
-        loss_grad = compute_loss_grad(disparity, depth, mask, device)
+        loss_ord = compute_l1_loss(disparity, depth)
+        loss_grad = compute_loss_grad(disparity, depth, device)
 
         # # loss weights computation
         # beta = 0.015

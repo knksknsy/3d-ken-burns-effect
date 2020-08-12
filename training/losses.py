@@ -29,42 +29,26 @@ def derivative_scale(tensor, h, device, norm=True):
     return torch.nn.functional.pad(diff_x, (0, 0, h, 0)), torch.nn.functional.pad(diff_y, (h, 0, 0, 0))
 
 
-def compute_loss_ord(disparity, target, mask):
-    L1Loss = torch.nn.L1Loss(reduction='sum')
-
-    loss = 0
-    N = torch.sum(mask)
-    
-    if N != 0:
-        loss = L1Loss(disparity * mask, target * mask) / N
-    return loss
+def compute_l1_loss(disparity, target):
+    L1Loss = torch.nn.L1Loss(reduction='mean')
+    return L1Loss(disparity, target)
 
 
-def compute_loss_grad(disparity, target, mask, device):        
+def compute_loss_grad(disparity, target, device):        
     scales = [2**i for i in range(4)]
-    MSELoss = torch.nn.MSELoss(reduction='sum')
+    MSELoss = torch.nn.MSELoss(reduction='mean')
 
     loss = 0
     for h in scales:
         g_h_disparity_x, g_h_disparity_y = derivative_scale(disparity, h, device, norm=True)
         g_h_target_x, g_h_target_y = derivative_scale(target, h, device, norm=True)
-        N = torch.sum(mask)
 
-        if N != 0:
-            loss += MSELoss(g_h_disparity_x * mask, g_h_target_x * mask) / N
-            loss += MSELoss(g_h_disparity_y * mask, g_h_target_y * mask) / N
+        loss += MSELoss(g_h_disparity_x, g_h_target_x)
+        loss += MSELoss(g_h_disparity_y, g_h_target_y)
 
     return loss
 
 
-def compute_loss_perception(output, target, device):
-    mask = torch.ones(output.shape).to(device)
-    MSELoss = torch.nn.MSELoss(reduction='sum')
-
-    loss = 0
-    N = torch.sum(mask)
-
-    if N != 0:
-        loss += (MSELoss(output * mask, target * mask) / N).pow(2)
-
-    return loss
+def compute_loss_perception(output, target):
+    MSELoss = torch.nn.MSELoss(reduction='mean')
+    return MSELoss(output, target)

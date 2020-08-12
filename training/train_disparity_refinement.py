@@ -1,7 +1,7 @@
 from disparity_refinement import Refine
 from transforms import ToTensor, DownscaleDepth
 from dataset import ImageDepthDataset
-from losses import get_kernels, derivative_scale, compute_loss_ord, compute_loss_grad
+from losses import get_kernels, derivative_scale, compute_l1_loss, compute_loss_grad
 from utils import load_model, save_model, get_eta_string, save_log, pad_number
 
 import torch
@@ -33,9 +33,8 @@ def train(args, refinementModel, data_loader, optimizer, scheduler, epoch, iter_
         disparity_refined = refinementModel(image, depth_adjusted)
 
         # reconstruction loss computation
-        mask = torch.ones(depth.shape).to(device)
-        loss_ord = compute_loss_ord(disparity_refined, depth, mask)
-        loss_grad = compute_loss_grad(disparity_refined, depth, mask, device)
+        loss_ord = compute_l1_loss(disparity_refined, depth)
+        loss_grad = compute_loss_grad(disparity_refined, depth, device)
 
         loss_depth = 0.0001 * loss_ord + loss_grad
         loss_depth.backward()
