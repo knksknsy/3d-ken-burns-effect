@@ -36,7 +36,9 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
         loss_color = compute_loss_ord(inpaint_color, image_gt, mask)
 
         with torch.no_grad(): # disable calculation of gradients
-            loss_perception = compute_loss_perception(vggModelRelu4(inpaint_color), vggModelRelu4(image_gt), device)
+            vgg_inpaint_color, vgg_image_gt = vggModelRelu4(inpaint_color), vggModelRelu4(image_gt)
+
+        loss_perception = compute_loss_perception(vgg_inpaint_color, vgg_image_gt, device)
         
         # depth inpainting loss computation
         loss_ord = compute_loss_ord(inpaint_depth, depth_gt, mask)
