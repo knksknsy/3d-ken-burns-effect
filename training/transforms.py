@@ -137,13 +137,13 @@ class RandomWarp(object):
             color_warped.append(softsplat.FunctionSoftsplat(tenInput=image_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax'))
         image_masked = color_warped[-1]
         image_masked[torch.isnan(image_masked)] = 0.0
-        image_gt = image_to
+        image_masked[torch.isinf(image_masked)] = 0.0
 
         depth_warped = []
         for intTime, fltTime in enumerate(np.linspace(0.0, 1.0, 11).tolist()):
 	        depth_warped.append(softsplat.FunctionSoftsplat(tenInput=depth_from, tenFlow=flow * fltTime, tenMetric=1.0 + depth_from, strType='softmax'))
         depth_masked = depth_warped[-1]
         depth_masked[torch.isnan(depth_masked)] = 0.0
-        depth_gt = depth_to
+        depth_masked[torch.isinf(depth_masked)] = 0.0
 
-        return {'image_masked': image_masked[0,:,:,:], 'image_gt': image_gt, 'depth_masked': depth_masked[0,:,:,:], 'depth_gt': depth_gt, 'fltFov': fltFov}
+        return {'image_masked': image_masked[0,:,:,:], 'image_gt': image_to, 'depth_masked': depth_masked[0,:,:,:], 'depth_gt': depth_to, 'fltFov': fltFov}

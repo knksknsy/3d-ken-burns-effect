@@ -131,8 +131,9 @@ class Inpaint(torch.nn.Module):
 		tenContext = self.moduleContext(torch.cat([ tenImage, tenDisparity ], 1))
 		tenRender = torch.cat([tenImageMasked, tenDisparityMasked, tenContext], 1)
 
-		tenMask = tenDisparityMasked.clone()
-		tenMask[tenMask > 0.0] = 1.0
+		tenMask = (tenDisparityMasked > 0.0).float()
+		tenMask = tenMask * spatial_filter(tenMask, 'median-5')
+		tenRender = tenRender * tenMask.detach().clone()
 
 		tenColumn = [ None, None, None, None ]
 
@@ -185,6 +186,45 @@ class Inpaint(torch.nn.Module):
 
 		return tenImage, torch.nn.functional.threshold(input=tenDisparity, threshold=0.0, value=0.0)
 	# end
+# end
+
+def init_weights(m):
+	if type(m) == torch.nn.Conv2d:
+		torch.nn.init.xavier_uniform_(m.weight)
+		torch.nn.init.constant_(m.bias, 0.0)
+
+def spatial_filter(tenInput, strType):
+	tenOutput = None
+
+	if strType == 'laplacian':
+		tenLaplacian = tenInput.new_zeros(tenInput.shape[1], tenInput.shape[1], 3, 3)
+
+		for intKernel in range(tenInput.shape[1]):
+			tenLaplacian[intKernel, intKernel, 0, 1] = -1.0
+			tenLaplacian[intKernel, intKernel, 0, 2] = -1.0
+			tenLaplacian[intKernel, intKernel, 1, 1] = 4.0
+			tenLaplacian[intKernel, intKernel, 1, 0] = -1.0
+			tenLaplacian[intKernel, intKernel, 2, 0] = -1.0
+		# end
+
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 1, 1, 1, 1 ], mode='replicate')
+		tenOutput = torch.nn.functional.conv2d(input=tenOutput, weight=tenLaplacian)
+
+	elif strType == 'median-3':
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 1, 1, 1, 1 ], mode='reflect')
+		tenOutput = tenOutput.unfold(2, 3, 1).unfold(3, 3, 1)
+		tenOutput = tenOutput.contiguous().view(tenOutput.shape[0], tenOutput.shape[1], tenOutput.shape[2], tenOutput.shape[3], 3 * 3)
+		tenOutput = tenOutput.median(-1, False)[0]
+
+	elif strType == 'median-5':
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 2, 2, 2, 2 ], mode='reflect')
+		tenOutput = tenOutput.unfold(2, 5, 1).unfold(3, 5, 1)
+		tenOutput = tenOutput.contiguous().view(tenOutput.shape[0], tenOutput.shape[1], tenOutput.shape[2], tenOutput.shape[3], 5 * 5)
+		tenOutput = tenOutput.median(-1, False)[0]
+
+	# end
+
+	return tenOutput
 # end
 
 if torch.cuda.is_available():

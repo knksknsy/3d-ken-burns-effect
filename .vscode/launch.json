@@ -55,7 +55,7 @@
             "request": "launch",
             "program": "./training/train_pointcloud_inpainting.py",
             "console": "integratedTerminal",
-            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "1", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "80"],
+            "args": ["--dataset-path", "D:\\3d-ken-burns-dataset", "--batch-size", "1", "--valid-size", "0", "--models-path", "model_checkpoints", "--logs-path", "logs", "--log-interval", "40"],
             "justMyCode": true
         },
         {

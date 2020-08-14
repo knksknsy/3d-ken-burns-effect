@@ -1,4 +1,4 @@
-from pointcloud_inpainting import Inpaint
+from pointcloud_inpainting import Inpaint, init_weights
 from transforms import ToTensor, RandomWarp
 from dataset import ImageDepthDataset
 from losses import get_kernels, derivative_scale, compute_l1_loss, compute_loss_grad, compute_loss_perception
@@ -12,6 +12,7 @@ import numpy as np
 from cv2 import cv2
 import os
 import time
+import sys
 
 device = 'cpu'
 if torch.cuda.is_available():
@@ -32,23 +33,28 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
         inpaint_color, inpaint_depth = inpaintModel(image_masked, image_gt, depth_masked, depth_gt)
 
         # color inpainting loss cumputation
-        loss_color = compute_l1_loss(inpaint_color, image_gt)
+        loss_color = compute_l1_loss(inpaint_color, image_gt, device)
 
         with torch.no_grad(): # disable calculation of gradients
             vgg_inpaint_color, vgg_image_gt = vggModelRelu4(inpaint_color), vggModelRelu4(image_gt)
 
-        loss_perception = compute_loss_perception(vgg_inpaint_color, vgg_image_gt)
+        loss_perception = compute_loss_perception(vgg_inpaint_color, vgg_image_gt, device)
         
         # depth inpainting loss computation
-        loss_ord = compute_l1_loss(inpaint_depth, depth_gt)
+        loss_ord = compute_l1_loss(inpaint_depth, depth_gt, device)
         loss_grad = compute_loss_grad(inpaint_depth, depth_gt, device)
         loss_depth = 0.0001 * loss_ord + loss_grad
 
         # combined loss computation
         loss_inpaint = loss_color + loss_perception + loss_depth
 
+        if len(torch.nonzero(torch.isnan(loss_inpaint.view(-1)))) > 0 or len(torch.nonzero(torch.isinf(loss_inpaint.view(-1)))) > 0:
+            print('Terminate training:')
+            print(f'Loss is nan or inf at iteration {(batch_idx * len(image_gt)) + (args.batch_size * args.log_interval)}')
+            sys.exit()
+
         loss_inpaint.backward()
-        torch.nn.utils.clip_grad_norm_(inpaintModel.parameters(), 1)
+        torch.nn.utils.clip_grad_norm_(inpaintModel.parameters(), 1.0)
         optimizer.step()
         scheduler.step()
 
@@ -63,8 +69,8 @@ def train(args, inpaintModel, vggModelRelu4, data_loader, optimizer, scheduler, 
             logs_path = os.path.join(args.logs_path, file_name)
             save_log(inpaint_color, file_name=f'{logs_path}-color.jpg')
             save_log(inpaint_depth, file_name=f'{logs_path}-depth.jpg')
-            #save_log(image_gt, file_name=f'{logs_path}-color-gt.jpg')
-            #save_log(depth_gt, file_name=f'{logs_path}-depth-gt.jpg')
+            save_log(image_gt, file_name=f'{logs_path}-color-gt.jpg')
+            save_log(depth_gt, file_name=f'{logs_path}-depth-gt.jpg')
 
             # compute estimated time of arrival
             t2 = time.time()
@@ -160,25 +166,26 @@ def main():
 
     iter_nb = 0
 
-    vggModelRelu4 = torchvision.models.vgg19_bn(pretrained=True).features.to(device).eval()
+    vggModel = torchvision.models.vgg19_bn(pretrained=True).features
     vggModelRelu4 = torch.nn.Sequential(
-        vggModelRelu4[0:3],
-        vggModelRelu4[3:6],
+        vggModel[0:3],
+        vggModel[3:6],
         torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModelRelu4[7:10],
-        vggModelRelu4[10:13],
+        vggModel[7:10],
+        vggModel[10:13],
         torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModelRelu4[14:17],
-        vggModelRelu4[17:20],
-        vggModelRelu4[20:23],
-        vggModelRelu4[23:26],
+        vggModel[14:17],
+        vggModel[17:20],
+        vggModel[20:23],
+        vggModel[23:26],
         torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModelRelu4[27:30],
-        vggModelRelu4[30:33],
-        vggModelRelu4[33:36],
-        vggModelRelu4[36:39])
+        vggModel[27:30],
+        vggModel[30:33],
+        vggModel[33:36],
+        vggModel[36:39])
 
-    inpaintModel = Inpaint().to(device).eval()
+    vggModelRelu4 = vggModelRelu4.to(device).eval()
+    inpaintModel = Inpaint().apply(init_weights).to(device).eval()
 
     optimizer = torch.optim.Adam(inpaintModel.parameters(), lr=args.lr, betas=(args.b1, args.b2))
     lambda_lr = lambda epoch: args.gamma_lr ** epoch

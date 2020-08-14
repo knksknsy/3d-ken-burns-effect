@@ -29,36 +29,57 @@ def derivative_scale(tensor, h, device, norm=True):
     return torch.nn.functional.pad(diff_x, (0, 0, h, 0)), torch.nn.functional.pad(diff_y, (h, 0, 0, 0))
 
 
-def compute_l1_loss(output, target):
-    L1Loss = torch.nn.L1Loss(reduction='mean')
-    loss = L1Loss(output, target)
+def compute_l1_loss(output, target, device):
+    mask = torch.ones(output.shape).to(device)
+    L1Loss = torch.nn.L1Loss(reduction='sum')
+    loss = 0
+    N = torch.sum(mask)
 
-    if torch.isnan(loss) or torch.isinf(loss):
-        loss = 0
+    if N != 0:
+        loss = L1Loss(output, target) / N
+    # if torch.isnan(loss) or torch.isinf(loss):
+    #     loss = 0
 
     return loss
 
 
 def compute_loss_grad(output, target, device):        
     scales = [2**i for i in range(4)]
-    MSELoss = torch.nn.MSELoss(reduction='mean')
-
+    MSELoss = torch.nn.MSELoss(reduction='sum')
     loss = 0
+    mask = torch.ones(output.shape).to(device)
+
     for h in scales:
         g_h_disparity_x, g_h_disparity_y = derivative_scale(output, h, device, norm=True)
         g_h_target_x, g_h_target_y = derivative_scale(target, h, device, norm=True)
+        N = torch.sum(mask)
 
-        loss += MSELoss(g_h_disparity_x, g_h_target_x)
-        loss += MSELoss(g_h_disparity_y, g_h_target_y)
+        if N != 0:
+            loss += MSELoss(g_h_disparity_x, g_h_target_x) / N
+            loss += MSELoss(g_h_disparity_y, g_h_target_y) / N 
+            # lx = MSELoss(g_h_disparity_x, g_h_target_x) / N
+            # if torch.isnan(lx) or torch.isinf(lx):
+            #     lx = 0
+            # else:
+            #     loss += lx
+            # ly = MSELoss(g_h_disparity_y, g_h_target_y) / N
+            # if torch.isnan(ly) or torch.isinf(ly):
+            #     ly = 0
+            # else:
+            #     loss += ly
 
     return loss
 
 
-def compute_loss_perception(output, target):
-    MSELoss = torch.nn.MSELoss(reduction='mean')
-    loss = MSELoss(output, target)
+def compute_loss_perception(output, target, device):
+    mask = torch.ones(output.shape).to(device)
+    MSELoss = torch.nn.MSELoss(reduction='sum')
+    loss = 0
+    N = torch.sum(mask)
 
-    if torch.isnan(loss) or torch.isinf(loss):
-        loss = 0
+    if N != 0:
+        loss = MSELoss(output, target) / N
+    # if torch.isnan(loss) or torch.isinf(loss):
+    #     loss = 0
 
     return loss
