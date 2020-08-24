@@ -227,10 +227,10 @@ def spatial_filter(tenInput, strType):
 	return tenOutput
 # end
 
-if torch.cuda.is_available():
-	moduleInpaint = Inpaint().to(device).eval(); moduleInpaint.load_state_dict(torch.load('./models/pointcloud_inpainting.pytorch'))
-else:
-	moduleInpaint = Inpaint().to(device).eval(); moduleInpaint.load_state_dict(torch.load('./models/pointcloud_inpainting.pytorch', map_location=torch.device('cpu')))
+# if torch.cuda.is_available():
+# 	moduleInpaint = Inpaint().to(device).eval(); moduleInpaint.load_state_dict(torch.load('./models/pointcloud_inpainting.pytorch'))
+# else:
+# 	moduleInpaint = Inpaint().to(device).eval(); moduleInpaint.load_state_dict(torch.load('./models/pointcloud_inpainting.pytorch', map_location=torch.device('cpu')))
 
 def pointcloud_inpainting(tenImage, tenDisparity, tenShift):
 	return moduleInpaint(tenImage, tenDisparity, tenShift)

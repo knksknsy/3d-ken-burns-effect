@@ -129,10 +129,10 @@ class Refine(torch.nn.Module):
 	# end
 # end
 
-if torch.cuda.is_available():
-	moduleRefine = Refine().to(device).eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch'))
-else:
-	moduleRefine = Refine().to(device).eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch', map_location=torch.device('cpu')))
+# if torch.cuda.is_available():
+# 	moduleRefine = Refine().to(device).eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch'))
+# else:
+# 	moduleRefine = Refine().to(device).eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch', map_location=torch.device('cpu')))
 
 def disparity_refinement(tenImage, tenDisparity):
 	return moduleRefine(tenImage, tenDisparity)

@@ -216,12 +216,12 @@ class Disparity(torch.nn.Module):
 	# end
 # end
 
-if torch.cuda.is_available():
-	moduleSemantics = Semantics().to(device).eval()
-	moduleDisparity = Disparity().to(device).eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch'))
-else:
-	moduleSemantics = Semantics().to(device).eval()
-	moduleDisparity = Disparity().to(device).eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch', map_location=torch.device('cpu')))
+# if torch.cuda.is_available():
+# 	moduleSemantics = Semantics().to(device).eval()
+# 	moduleDisparity = Disparity().to(device).eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch'))
+# else:
+# 	moduleSemantics = Semantics().to(device).eval()
+# 	moduleDisparity = Disparity().to(device).eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch', map_location=torch.device('cpu')))
 
 def disparity_estimation(tenImage):
 	# tenImage.shape = (1, 3, 768, 1024) (mini-batch, channels, height, width)
