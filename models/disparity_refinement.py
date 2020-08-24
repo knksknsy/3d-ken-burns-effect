@@ -124,7 +124,10 @@ class Refine(torch.nn.Module):
 	# end
 # end
 
-moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch'))
+# load our pretrained model
+moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/our_disparity_refinement.pt')['model_state_dict'])
+# load Niklaus et al. pretrained model
+# moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch'))
 
 def disparity_refinement(tenImage, tenDisparity):
 	return moduleRefine(tenImage, tenDisparity)

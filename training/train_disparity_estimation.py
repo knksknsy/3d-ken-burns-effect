@@ -40,12 +40,6 @@ def train(args, disparityModel, semanticsModel, data_loader, optimizer, schedule
         loss_ord = compute_l1_loss(disparity, depth)
         loss_grad = compute_loss_grad(disparity, depth, device)
 
-        # # loss weights computation
-        # beta = 0.015
-        # # gamma_ord = 0.03 * (1 + 2 * np.exp(-beta * iter_nb)) # for scale-invariant Loss 
-        # gamma_ord = 0.001 * (1 + 200 * np.exp( - beta * iter_nb)) # for L1 loss
-        # gamma_grad = 1 - np.exp(-beta * iter_nb)
-
         # loss_depth = gamma_ord * loss_ord + gamma_grad * loss_grad # Niklaus' paper => 0.0001 * loss_ord + loss_grad
         loss_depth = 0.0001 * loss_ord + loss_grad
         loss_depth.backward()
@@ -116,9 +110,9 @@ def parse_args():
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--models-path', action='store',
-                        type=str, default='../model_checkpoints', help='Path to save model checkpoints')
+                        type=str, default='../model_checkpoints_estimation', help='Path to save model checkpoints')
     parser.add_argument('--logs-path', action='store',
-                        type=str, default='../logs', help='Path to save logs')
+                        type=str, default='../logs_estimation', help='Path to save logs')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
     parser.add_argument('--valid-size', type=float, default=0.01, metavar='VS',

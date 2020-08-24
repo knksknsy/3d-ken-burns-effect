@@ -162,48 +162,30 @@ class Disparity(torch.nn.Module):
 	# end
 
 	def forward(self, tenImage, tenSemantics):
-		order = []
 		tenColumn = [ None, None, None, None, None, None ]
 
 		tenColumn[0] = self.moduleImage(tenImage)
-		order.append('moduleImage')
 		tenColumn[1] = self._modules['0x0 - 1x0'](tenColumn[0]) # Downsample ...
-		order.append('0x0 - 1x0')
 		tenColumn[2] = self._modules['1x0 - 2x0'](tenColumn[1])
-		order.append('1x0 - 2x0')
-		order.append('<SUM>')
 		tenColumn[3] = self._modules['2x0 - 3x0'](tenColumn[2]) + self.moduleSemantics(tenSemantics)
-		order.append('2x0 - 3x0')
-		order.append('moduleSemantics')
-		order.append('</SUM>')
 		tenColumn[4] = self._modules['3x0 - 4x0'](tenColumn[3])
-		order.append('3x0 - 4x0')
 		tenColumn[5] = self._modules['4x0 - 5x0'](tenColumn[4]) # ... Downsample
-		order.append('4x0 - 5x0')
 
 		intColumn = 1
 		for intRow in range(len(tenColumn)):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '0x0 - 0x1', '1x0 - 1x1', ..., '5x0 - 5x1' # Image and semantic features
-			if intRow != 0:
-				order.append('<SUM>')
-			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
+
 			if intRow != 0: # ignore first
 				tenColumn[intRow] += self._modules[str(intRow - 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow - 1]) # '0x1 - 1x1', '1x1 - 2x1', '2x1 - 3x1', '3x1 - 4x1', '4x1 - 5x1' # Downsampling col 1
-				order.append(str(intRow - 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
-				order.append('</SUM>')
 			# end
 		# end
 
 		intColumn = 2
 		for intRow in range(len(tenColumn) -1, -1, -1):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '5x1 - 5x2', ..., '1x1 - 1x2', '0x1 - 0x2'
-			if intRow != len(tenColumn) - 1:
-				order.append('<SUM>')
-			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
+
 			if intRow != len(tenColumn) - 1: # ignore first
 				tenUp = self._modules[str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow + 1]) # '5x2 - 4x2', '4x2 - 3x2', '3x2 - 2x2', '2x2 - 1x2', '1x2 - 0x2' # Upsampline col 2
-				order.append(str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
-				order.append('</SUM>')
 
 				if tenUp.shape[2] != tenColumn[intRow].shape[2]:
 					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
@@ -217,13 +199,9 @@ class Disparity(torch.nn.Module):
 		intColumn = 3
 		for intRow in range(len(tenColumn) -1, -1, -1):
 			tenColumn[intRow] = self._modules[str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow]) # '5x2 - 5x3', ..., '1x2 - 1x3', '0x2 - 0x3'  
-			if intRow != len(tenColumn) - 1:
-				order.append('<SUM>')
-			order.append(str(intRow) + 'x' + str(intColumn - 1) + ' - ' + str(intRow) + 'x' + str(intColumn))
+
 			if intRow != len(tenColumn) - 1: # ignore first
 				tenUp = self._modules[str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn)](tenColumn[intRow + 1]) # '5x3 - 4x3', '4x3 - 3x3', '3x3 - 2x3', '2x3 - 1x3', '1x3 - 0x3' # Upsampline col 3
-				order.append(str(intRow + 1) + 'x' + str(intColumn) + ' - ' + str(intRow) + 'x' + str(intColumn))
-				order.append('</SUM>')
 
 				if tenUp.shape[2] != tenColumn[intRow].shape[2]:
 					tenUp = torch.nn.functional.pad(input=tenUp, pad=[ 0, 0, 0, -1 ], mode='constant', value=0.0) # padding
@@ -234,23 +212,7 @@ class Disparity(torch.nn.Module):
 			# end
 		# end
 
-		tr = torch.nn.functional.threshold(input=self.moduleDisparity(tenColumn[0]), threshold=0.0, value=0.0)
-		order.append('<THRESHOLD>[0,0]')
-		order.append('moduleDisparity')
-		order.append('</THRESHOLD>')
-
-		architecture = []
-		for i, o in enumerate(order):
-			if i < len(order)-1:
-				if 'SUM' not in o and 'THRESHOLD' not in o:
-					layersObject = self._modules[o]
-				else:
-					layersObject = {}
-				
-				architecture.append(f'name: {o}')
-				architecture.append(f'layers: {layersObject}')
-
-		return tr
+		return torch.nn.functional.threshold(input=self.moduleDisparity(tenColumn[0]), threshold=0.0, value=0.0)
 	# end
 # end
 

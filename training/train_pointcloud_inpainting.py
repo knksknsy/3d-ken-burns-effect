@@ -123,9 +123,9 @@ def parse_args():
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--models-path', action='store',
-                        type=str, default='../model_checkpoints', help='Path to save model checkpoints')                
+                        type=str, default='../model_checkpoints_inpainting', help='Path to save model checkpoints')                
     parser.add_argument('--logs-path', action='store',
-                        type=str, default='../logs', help='Path to save logs')
+                        type=str, default='../logs_inpainting', help='Path to save logs')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
     parser.add_argument('--valid-size', type=float, default=0.01, metavar='VS',
@@ -136,6 +136,25 @@ def parse_args():
                         help='Training is continued from saved model checkpoints saved in --checkpoints-path argument)')
     return parser.parse_args()
 
+def get_vgg19_relu4():
+    vggModel = torchvision.models.vgg19_bn(pretrained=True).features
+    vggModelRelu4 = torch.nn.Sequential(
+        vggModel[0:3],
+        vggModel[3:6],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModel[7:10],
+        vggModel[10:13],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModel[14:17],
+        vggModel[17:20],
+        vggModel[20:23],
+        vggModel[23:26],
+        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
+        vggModel[27:30],
+        vggModel[30:33],
+        vggModel[33:36],
+        vggModel[36:39])
+    return vggModelRelu4
 
 def main():
     # get arguments from CLI
@@ -166,24 +185,7 @@ def main():
 
     iter_nb = 0
 
-    vggModel = torchvision.models.vgg19_bn(pretrained=True).features
-    vggModelRelu4 = torch.nn.Sequential(
-        vggModel[0:3],
-        vggModel[3:6],
-        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModel[7:10],
-        vggModel[10:13],
-        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModel[14:17],
-        vggModel[17:20],
-        vggModel[20:23],
-        vggModel[23:26],
-        torch.nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True),
-        vggModel[27:30],
-        vggModel[30:33],
-        vggModel[33:36],
-        vggModel[36:39])
-
+    vggModelRelu4 = get_vgg19_relu4()
     vggModelRelu4 = vggModelRelu4.to(device).eval()
     inpaintModel = Inpaint().apply(init_weights).to(device).eval()
 

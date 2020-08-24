@@ -5,6 +5,7 @@ import os
 import time
 
 def load_model(model, models_path, continue_training=False):
+    """Load either newest saved model (`continue_training=False`) or load a model from `models_path` if `continue_training=True`."""
     iter_nb = 0
 
     # Get latest model .pt files in directory models_path
@@ -32,6 +33,7 @@ def save_model(models_dict, iter_nb, path):
 
 
 def get_eta_string(t1, t2, current_step, total_steps, epoch, args):
+    """Calculate estimated time of arrival for training duration."""
     time_per_sample = (t2 - t1) / args.batch_size
     estimated_time_arrival = ((total_steps * args.epochs) - (current_step + ((epoch - 1) * total_steps))) * time_per_sample
     left_epochs = args.epochs + 1 - epoch

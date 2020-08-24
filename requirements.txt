@@ -7,3 +7,13 @@ opencv-contrib-python>=3.4.0
 scipy>=1.1.0
 torch>=1.2.0
 torchvision>=0.4.0
+zipfile
+copy
+pandas
+json
+argparse
+tqdm
+getopt
+urllib
+pathlib
+matplotlib

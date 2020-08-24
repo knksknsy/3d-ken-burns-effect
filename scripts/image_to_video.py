@@ -1,5 +1,3 @@
-'''Generate a video for each data (stereo-vision pictures) in 3d-ken-burns-dataset'''
-'''Place this script into the 3d-ken-burns-dataset directory and execute it in order to generate videos'''
 '''Usage e.g.: python image_to_video.py --path D:\3d-ken-burns-dataset'''
 
 from cv2 import cv2
@@ -49,7 +47,7 @@ class Images2Video:
         images.sort()
         pbar = tqdm(zip(*[iter(images)]*4))
 
-        for bl, br, tl, tr in pbar:
+        for i, (bl, br, tl, tr) in enumerate(pbar):
             pbar.set_description(f'Processing video {video_name}: Total images {len(images)//4}: Processed Images: ')
 
             image_bl_data = archive.read(bl)

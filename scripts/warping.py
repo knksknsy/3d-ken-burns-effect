@@ -9,11 +9,6 @@ from cv2 import cv2
 
 import softsplat
 
-# TODO: Implement torch.utils.data.Dataset => InpaintingDataset
-# TODO: InpaintingDataset.__getitem__(): get random masked input (image and depth) + get GT (image and depth)
-# TODO: InpaintingDataset.__getitem__(): get feature acttivations from VGG-19 relu4_4 for masked input (image and depth), and GT (image and depth)
-# TODO: Implement transforms => 
-
 file_image1 = 'images/test/00001-bl-image.png'
 file_depth1 = 'images/test/00001-bl-depth.exr'
 file_image2 = 'images/test/00001-br-image.png'

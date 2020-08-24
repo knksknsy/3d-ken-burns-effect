@@ -71,6 +71,7 @@ class DownscaleDepth(object):
 class RandomRescaleCrop(object):
     """Randomly crop input image to random scales. Crops either top and bottom or right and left with probability of 50 %"""
 
+    # counter assures that exactly same transformations will be used for each batch
     batch_process_count = 0
     crop_top_bottom = True
     crop_start = 0
@@ -93,6 +94,8 @@ class RandomRescaleCrop(object):
             RandomRescaleCrop.crop_start = round(np.random.uniform(0.0, crop_keep), 2)
             RandomRescaleCrop.crop_end = round(np.random.uniform(0.0, crop_keep - RandomRescaleCrop.crop_start), 2)
 
+        # for training the depth estimation network, the input images are either randomly cropped at top and bottom, or left or right
+        # this assures variance with regart to the aspect ratio
         if RandomRescaleCrop.crop_top_bottom:
             # crop top and bottom
             idx_start_depth = int(RandomRescaleCrop.crop_start * depth_height)

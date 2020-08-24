@@ -93,6 +93,16 @@ def process_load(npyImage, objSettings):
 def process_inpaint(tenShift):
 	objInpainted = pointcloud_inpainting(objCommon['tenRawImage'], objCommon['tenRawDisparity'], tenShift)
 
+	# TODO
+	tenImageOut = (objInpainted['tenImage'][0, 0:3, :, :].clamp(0.0, 1.0).detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+	tenImageOut = cv2.resize(src=tenImageOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+	cv2.imwrite(f'./images/autozoom/kbe/inpainting/color_extreme_view_{tenShift[0][1].item():.2f}.png', tenImageOut)
+
+	# TODO
+	tenDisparityOut = objInpainted['tenDisparity'][0, 0, :, :].detach().cpu().numpy()
+	tenDisparityOut = cv2.resize(src=tenDisparityOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+	cv2.imwrite(f'./images/autozoom/kbe/inpainting/depth_extreme_view_{tenShift[0][1].item():.2f}.png', tenDisparityOut)
+
 	objInpainted['tenDepth'] = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (objInpainted['tenDisparity'] + 0.0000001)
 	objInpainted['tenValid'] = (spatial_filter(objInpainted['tenDisparity'] / objInpainted['tenDisparity'].max(), 'laplacian').abs() < 0.03).float()
 	objInpainted['tenPoints'] = depth_to_points(objInpainted['tenDepth'] * objInpainted['tenValid'], objCommon['fltFocal'])
@@ -177,14 +187,14 @@ def process_autozoom(objSettings):
 			tenRender, tenExisting = render_pointcloud(tenPoints, objCommon['tenRawImage'].view(1, 3, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
 			# # TODO
-			tenRenderOut = tenRender[0,:, :, :].cpu().numpy()
-			tenRenderOut = (tenRenderOut * 255).astype(numpy.uint8)
-			tenRenderOut = tenRenderOut.transpose(1,2,0)
-			cv2.imwrite(f'./images/autozoom/render/tenRender_{intU}_{intV}.png', tenRenderOut)
+			# tenRenderOut = tenRender[0,:, :, :].cpu().numpy()
+			# tenRenderOut = (tenRenderOut * 255).astype(numpy.uint8)
+			# tenRenderOut = tenRenderOut.transpose(1,2,0)
+			# cv2.imwrite(f'./images/autozoom/render/tenRender_{intU}_{intV}.png', tenRenderOut)
 
-			tenExistingOut = tenExisting[0, 0, :, :].cpu().numpy()
-			tenExistingOut = (tenExistingOut * 255).astype(numpy.uint8)
-			cv2.imwrite(f'./images/autozoom/existing/tenExisting_{intU}_{intV}.png', tenExistingOut)
+			# tenExistingOut = tenExisting[0, 0, :, :].cpu().numpy()
+			# tenExistingOut = (tenExistingOut * 255).astype(numpy.uint8)
+			# cv2.imwrite(f'./images/autozoom/existing/tenExisting_{intU}_{intV}.png', tenExistingOut)
 
 			if fltBest < (tenExisting > 0.0).float().sum().item():
 				fltBest = (tenExisting > 0.0).float().sum().item()
@@ -258,10 +268,10 @@ def process_kenburns(objSettings):
 		tenRender, tenExisting = render_pointcloud(tenPoints, torch.cat([ objCommon['tenInpaImage'], objCommon['tenInpaDepth'] ], 1).view(1, 4, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
 		# TODO
-		tenRenderOut = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
-		tenRenderOut = cv2.getRectSubPix(image=tenRenderOut, patchSize=(max(objSettings['objFrom']['intCropWidth'], objSettings['objTo']['intCropWidth']), max(objSettings['objFrom']['intCropHeight'], objSettings['objTo']['intCropHeight'])), center=(objCommon['intWidth'] / 2.0, objCommon['intHeight'] / 2.0))
-		tenRenderOut = cv2.resize(src=tenRenderOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
-		cv2.imwrite(f'./images/autozoom/kbe/render/{fltStep:.4f}.png', tenRenderOut)
+		# tenRenderOut = (tenRender[0, 0:3, :, :].detach().cpu().numpy().transpose(1, 2, 0) * 255.0).clip(0.0, 255.0).astype(numpy.uint8)
+		# tenRenderOut = cv2.getRectSubPix(image=tenRenderOut, patchSize=(max(objSettings['objFrom']['intCropWidth'], objSettings['objTo']['intCropWidth']), max(objSettings['objFrom']['intCropHeight'], objSettings['objTo']['intCropHeight'])), center=(objCommon['intWidth'] / 2.0, objCommon['intHeight'] / 2.0))
+		# tenRenderOut = cv2.resize(src=tenRenderOut, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
+		# cv2.imwrite(f'./images/autozoom/kbe/render/{fltStep:.4f}.png', tenRenderOut)
 
 		tenRender = fill_disocclusion(tenRender, tenRender[:, 3:4, :, :] * (tenExisting > 0.0).float())
 
@@ -270,7 +280,7 @@ def process_kenburns(objSettings):
 		npyOutput = cv2.resize(src=npyOutput, dsize=(objCommon['intWidth'], objCommon['intHeight']), fx=0.0, fy=0.0, interpolation=cv2.INTER_LINEAR)
 
 		# TODO
-		cv2.imwrite(f'./images/autozoom/kbe/output/{fltStep:.4f}.png', npyOutput)
+		# cv2.imwrite(f'./images/autozoom/kbe/output/{fltStep:.4f}.png', npyOutput)
 
 		npyOutputs.append(npyOutput)
 	# end

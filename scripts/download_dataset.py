@@ -1,5 +1,3 @@
-'''Copy this script to a path and execute it in order to download the dataset into the path.'''
-
 from enum import Enum
 import re
 import urllib.request

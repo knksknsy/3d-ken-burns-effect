@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "autozoom.py",
             "console": "integratedTerminal",
-            "args": ["--in", "./images/rice.jpg", "--out", "./videos/rice.mp4"],
+            "args": ["--in", "./images/alpen.jpeg", "--out", "./videos/alpen.mp4"],
             "justMyCode": true
         },
         {

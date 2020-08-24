@@ -12,6 +12,7 @@ from cv2 import cv2
 class ImageDepthDataset(Dataset):
     """Image Depth dataset."""
 
+    # counter assures that exactly same transformations will be used for each batch
     batch_process_count = 0
 
     def __init__(self, csv_file, dataset_path, train_mode='estimation', transform=None):
@@ -43,30 +44,48 @@ class ImageDepthDataset(Dataset):
         indices = list(range(num_train))
         assert ((valid_size >= 0) and (valid_size <= 1)), 'valid-size should be in the range [0, 1].'
         split = int(np.floor(valid_size * num_train))
+        # randomly shuffle the dataset
         np.random.seed(seed)
         np.random.shuffle(indices)
 
+        # split the dataset into training and validation sets
         train_idx, valid_idx = indices[split:], indices[:split]
         train_sampler = SubsetRandomSampler(train_idx)
         valid_sampler = SubsetRandomSampler(valid_idx)
 
+        # initialize training and validation DataLoaders used in the training loop to read batches of samples
         train_loader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
         valid_loader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
 
         return train_loader, valid_loader
 
     def __len__(self):
+        """Return the length of the dataset"""
         return len(self.dataset_frame)
 
     def __getitem__(self, idx):
+        """
+        This method will be called during the training loop.
+        E.g.: `for batch_idx, sample_batched in enumerate(data_loader)`.
+
+        `data_loader` can be initialized by calling the `get_train_valid_loader()` method like:
+
+        `transform = transforms.Compose([DownscaleDepth(), RandomRescaleCrop(args.batch_size), ToTensor(device)])`
+
+        `dataset = ImageDepthDataset(csv_file='dataset.csv', dataset_path=args.dataset_path, train_mode='estimation', transform=transform)`
+
+        `train_loader, valid_loader = dataset.get_train_valid_loader(args.batch_size, args.valid_batch_size, args.valid_size, args.seed, args.num_workers, args.pin_memory)`
+        """
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+        # get paths to virtual environments
         zip_image_path = os.path.join(self.dataset_path, self.dataset_frame.iloc[idx, 0])
         zip_depth_path = os.path.join(self.dataset_path, self.dataset_frame.iloc[idx, 1])
         baseline = 20
 
         if self.train_mode == 'estimation' or self.train_mode == 'refinement':
+            # get paths for image and its depth map
             image_path = self.dataset_frame.iloc[idx, 2]
             depth_path = self.dataset_frame.iloc[idx, 3]
 
@@ -91,6 +110,7 @@ class ImageDepthDataset(Dataset):
             sample = {'image': image, 'depth': depth, 'fltFov': fltFov, 'train_mode': self.train_mode}
 
         elif self.train_mode == 'inpainting':
+            # get column ids for images and its depth maps (4 views per image and depth map: TL, TR, BL, BR)
             tl_idx, tr_idx, bl_idx, br_idx = [2,6], [3,7], [4,8], [5,9]
             fltFov = self.dataset_frame.iloc[idx, 10]
 
@@ -107,9 +127,9 @@ class ImageDepthDataset(Dataset):
             ]
 
             # randomly choose one warping direction
+            # use the same warping direction for each sample in a batch 
             if (self.batch_process_count == 0):
                 self.warping_direction_idx = np.random.randint(0, len(warpings))
-
             warping_direction = warpings[self.warping_direction_idx]
 
             # read imageFrom and imageTo
@@ -141,6 +161,7 @@ class ImageDepthDataset(Dataset):
 
             sample = {'image_from': image_from, 'image_to': image_to, 'depth_from': depth_from, 'depth_to': depth_to, 'flow': warping_direction['flow'], 'fltFov': fltFov, 'train_mode': self.train_mode}
 
+        # apply transformations (see training/transforms.py)
         if self.transform:
             sample = self.transform(sample)
 

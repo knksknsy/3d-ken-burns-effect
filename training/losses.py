@@ -1,8 +1,9 @@
 import torch
 import torchvision
 
-# Create kernels used for gradient computation
+
 def get_kernels(h, device):
+    """Create kernels used for gradient computation of different scales derived from `h`."""
     kernel_elements = [-1] + [0 for _ in range(h-1)] + [1]
     kernel_elements_div = [1] + [0 for _ in range(h-1)] + [1]
     weight_y = torch.Tensor(kernel_elements).view(1,-1)
@@ -15,6 +16,7 @@ def get_kernels(h, device):
 
 
 def derivative_scale(tensor, h, device, norm=True):
+    """Calculate derivative scale for `tensor` in x and y directions."""
     kernel_x, kernel_x_norm, kernel_y, kernel_y_norm = get_kernels(h, device)
     
     diff_x = torch.nn.functional.conv2d(tensor, kernel_x.view(1,1,-1,1))
@@ -30,6 +32,7 @@ def derivative_scale(tensor, h, device, norm=True):
 
 
 def compute_l1_loss(output, target, device):
+    """Compute L1 loss from `output` and `target` tensors."""
     mask = torch.ones(output.shape).to(device)
     L1Loss = torch.nn.L1Loss(reduction='sum')
     loss = 0
@@ -37,13 +40,12 @@ def compute_l1_loss(output, target, device):
 
     if N != 0:
         loss = L1Loss(output, target) / N
-    # if torch.isnan(loss) or torch.isinf(loss):
-    #     loss = 0
 
     return loss
 
 
-def compute_loss_grad(output, target, device):        
+def compute_loss_grad(output, target, device):
+    """Compute L2 loss from `output` and `target` tensors. Loss is computed for different scales of derivatives in x and y direction."""    
     scales = [2**i for i in range(4)]
     MSELoss = torch.nn.MSELoss(reduction='sum')
     loss = 0
@@ -57,21 +59,12 @@ def compute_loss_grad(output, target, device):
         if N != 0:
             loss += MSELoss(g_h_disparity_x, g_h_target_x) / N
             loss += MSELoss(g_h_disparity_y, g_h_target_y) / N 
-            # lx = MSELoss(g_h_disparity_x, g_h_target_x) / N
-            # if torch.isnan(lx) or torch.isinf(lx):
-            #     lx = 0
-            # else:
-            #     loss += lx
-            # ly = MSELoss(g_h_disparity_y, g_h_target_y) / N
-            # if torch.isnan(ly) or torch.isinf(ly):
-            #     ly = 0
-            # else:
-            #     loss += ly
 
     return loss
 
 
 def compute_loss_perception(output, target, device):
+    """Compute perceptual L2 loss from `output` and `target` tensors."""
     mask = torch.ones(output.shape).to(device)
     MSELoss = torch.nn.MSELoss(reduction='sum')
     loss = 0
@@ -79,7 +72,5 @@ def compute_loss_perception(output, target, device):
 
     if N != 0:
         loss = MSELoss(output, target) / N
-    # if torch.isnan(loss) or torch.isinf(loss):
-    #     loss = 0
 
     return loss
