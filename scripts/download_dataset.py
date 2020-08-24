@@ -104,7 +104,7 @@ def main(dataset_path):
 
     # Create 3d-ken-burns-dataset directory if it does not exist
     if not path.exists(dataset_path):
-        os.mkdir(dataset_path)
+        os.makedirs(dataset_path)
     
     # User input for starting or canceling download procedure
     print('Start download? Type [N] to cancel. Press return to start download.')
