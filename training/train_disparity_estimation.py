@@ -110,9 +110,9 @@ def parse_args():
     parser.add_argument('--dataset-path', action='store',
                         type=str, help='Path to dataset')
     parser.add_argument('--models-path', action='store',
-                        type=str, default='../model_checkpoints_estimation', help='Path to save model checkpoints')
+                        type=str, default='../../model_checkpoints_estimation', help='Path to save model checkpoints')
     parser.add_argument('--logs-path', action='store',
-                        type=str, default='../logs_estimation', help='Path to save logs')
+                        type=str, default='../../logs_estimation', help='Path to save logs')
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='Set number of workers for multiprocessing. List CPU cores with $lscpu. Disabled on Windows => num-workers=0')
     parser.add_argument('--valid-size', type=float, default=0.01, metavar='VS',
