@@ -1,4 +1,6 @@
 cupy-cuda102
+pytorch
+cudatoolkit==10.2
 flask>=1.0.0
 gevent>=1.3.0
 moviepy>=1.0.0
