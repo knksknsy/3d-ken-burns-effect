@@ -1,5 +1,3 @@
-models/*.pytorch
-models/*.pt
 videos/
 images/autozoom/
 model_checkpoints/

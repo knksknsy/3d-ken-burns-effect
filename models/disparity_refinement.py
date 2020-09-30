@@ -125,7 +125,7 @@ class Refine(torch.nn.Module):
 # end
 
 # load our pretrained model
-moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/our_disparity_refinement.pt')['model_state_dict'])
+moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/our_disparity_refinement.pt'))
 # load Niklaus et al. pretrained model
 # moduleRefine = Refine().cuda().eval(); moduleRefine.load_state_dict(torch.load('./models/disparity_refinement.pytorch'))
 

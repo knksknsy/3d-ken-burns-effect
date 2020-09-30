@@ -213,7 +213,7 @@ class Disparity(torch.nn.Module):
 
 moduleSemantics = Semantics().cuda().eval()
 # load our pretrained model
-moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./models/our_disparity_estimation.pt')['model_state_dict'])
+moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./models/our_disparity_estimation.pt'))
 # load Niklaus et al. pretrained model
 # moduleDisparity = Disparity().cuda().eval(); moduleDisparity.load_state_dict(torch.load('./models/disparity_estimation.pytorch'))
 

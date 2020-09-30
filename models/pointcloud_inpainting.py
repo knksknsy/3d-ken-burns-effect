@@ -199,7 +199,7 @@ class Inpaint(torch.nn.Module):
 # end
 
 # load our pretrained model
-moduleInpaint = Inpaint().cuda().eval(); moduleInpaint.load_state_dict(torch.load('./models/our_pointcloud_inpainting.pt')['model_state_dict'])
+moduleInpaint = Inpaint().cuda().eval(); moduleInpaint.load_state_dict(torch.load('./models/our_pointcloud_inpainting.pt'))
 # load Niklaus et al. pretrained model
 # moduleInpaint = Inpaint().cuda().eval(); moduleInpaint.load_state_dict(torch.load('./models/pointcloud_inpainting.pytorch'))
 
