@@ -17,6 +17,16 @@ conda install -c conda-forge --file requirements.txt
 
 Several functions are implemented in CUDA using CuPy, which is why CuPy is a required dependency. It can be installed using `pip install cupy` or alternatively using one of the provided binary packages as outlined in the CuPy repository. Please also make sure to have the `CUDA_HOME` environment variable configured.
 
+## Download IPYNB notebooks and assets
+For running the notebooks locally on your machine, download the files from [Google Drive](https://drive.google.com/file/d/1w8KcFs88MMbD1ZHww4Q3ieMkffmj5XdC/view?usp=sharing).
+Unpack the `notebooks.tar.gz` file by executing the following command in the terminal:
+```
+tar -xzf notebooks.tar.gz
+```
+It is recommended to unpack the files into the root directory of the project.
+
+Instructions for downloading the dataset and training the model can be found in chapters [Dataset](#dataset) and [Training](#training) respectively.
+
 ## Usage
 To run it on an image and generate the 3D Ken Burns effect fully automatically, use the following command.
 
@@ -38,6 +48,7 @@ python depthestim.py --in ./images/doublestrike.jpg --out ./depthestim.npy
 
 To benchmark the depth estimation, run `python scripts/benchmark.py`. You can use it to easily verify that the provided implementation runs as expected.
 
+<a id='dataset'></a>
 ## Dataset
 This dataset is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International Public License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) and may only be used for non-commercial purposes. Please see the LICENSE file for more information.
 
@@ -46,6 +57,7 @@ The dataset can be downloaded with the following line:
 
 This script will also generate two CSV files necessary for training the model.
 
+<a id='training'></a>
 ## Training
 The training of the following networks can be triggered with:
 
@@ -81,4 +93,4 @@ This is a project by Adobe Research. It is licensed under the [Creative Commons 
 ```
 
 ## Acknowledgment
-This is the implementation of <a href="https://arxiv.org/abs/1909.05483">3D Ken Burns Effect from a Single Image</a> from Niklaus et. al. Make sure to check their paper.
+This is the implementation of <a href="https://arxiv.org/abs/1909.05483">3D Ken Burns Effect from a Single Image</a> from Niklaus et. al.
